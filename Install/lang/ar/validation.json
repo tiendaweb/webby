@@ -1,0 +1,5 @@
+{
+    "The :attribute field is required.": "حقل :attribute مطلوب.",
+    "The :attribute has already been taken.": ":attribute مستخدم بالفعل.",
+    "The selected :attribute is invalid.": ":attribute المحدد غير صالح."
+}

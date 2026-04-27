@@ -1,0 +1,15 @@
+export { AnimatedSection } from './AnimatedSection';
+export { Navbar } from './Navbar';
+export { HeroSection } from './HeroSection';
+export { SocialProof } from './SocialProof';
+export { TrustedBy } from './TrustedBy';
+export { FeaturesBento } from './FeaturesBento';
+export { ProductShowcase } from './ProductShowcase';
+export { UseCases } from './UseCases';
+export { CategoryGallery } from './CategoryGallery';
+export { TestimonialsSection } from './TestimonialsSection';
+export { FAQSection } from './FAQSection';
+export { FinalCTA } from './FinalCTA';
+export { Footer } from './Footer';
+export { PricingSection } from './PricingSection';
+export { ScrollToTop } from './ScrollToTop';

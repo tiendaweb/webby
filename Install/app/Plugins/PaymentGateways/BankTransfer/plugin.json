@@ -1,0 +1,17 @@
+{
+    "name": "Bank Transfer",
+    "slug": "bank-transfer",
+    "description": "Accept manual bank transfer payments with admin approval workflow",
+    "version": "1.0.0",
+    "author": "Titan Systems",
+    "author_url": "https://titansys.dev",
+    "type": "payment_gateway",
+    "icon": "plugins/bank-transfer/icon.svg",
+    "main_class": "src/BankTransferPlugin.php",
+    "namespace": "App\\Plugins\\PaymentGateways\\BankTransferPlugin",
+    "requirements": {
+        "php": ">=8.2",
+        "laravel": ">=11.0"
+    },
+    "migrations": []
+}

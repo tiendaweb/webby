@@ -1,0 +1,9 @@
+*
+!templates/
+!templates/default-template.zip
+!templates/ecommerce-template.zip
+!templates/dashboard-template.zip
+!templates/cms-template.zip
+!templates/landing-template.zip
+!templates/portfolio-template.zip
+!.gitignore

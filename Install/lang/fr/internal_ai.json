@@ -1,0 +1,36 @@
+{
+    "suggestions": {
+        "1": "Créer une application de gestion de tâches",
+        "2": "Créer un site web portfolio",
+        "3": "Concevoir une page d'accueil",
+        "4": "Créer une boutique en ligne"
+    },
+    "typing_prompts": {
+        "1": "Créer un site web portfolio moderne avec le mode sombre...",
+        "2": "Créer une application de gestion de tâches avec glisser-déposer...",
+        "3": "Concevoir une page d'accueil pour mon startup SaaS...",
+        "4": "Créer une boutique en ligne avec fonctionnalité de panier...",
+        "5": "Créer une plateforme de blog avec support Markdown...",
+        "6": "Créer un tableau de bord pour le suivi des analyses...",
+        "7": "Concevoir un système de réservation pour rendez-vous...",
+        "8": "Créer un feed de médias sociaux avec défilement infini..."
+    },
+    "greetings": {
+        "1": "Que voulez-vous créer, {name} ?",
+        "2": "Que devrions-nous créer, {name} ?",
+        "3": "Que souhaiteriez-vous créer, {name} ?",
+        "4": "Que puis-je vous aider à créer, {name} ?"
+    },
+    "hero_headlines": {
+        "1": "Que créez-vous ?",
+        "2": "Que construisez-vous ?",
+        "3": "Créez l'extraordinaire",
+        "4": "Vos idées, réalisées"
+    },
+    "hero_subtitles": {
+        "1": "Créez des sites web étonnants en discutant avec l'IA.",
+        "2": "Transformez vos idées en sites web avec l'IA.",
+        "3": "Créez de beaux sites web par la conversation.",
+        "4": "Décrivez votre vision et regardez-la prendre vie."
+    }
+}

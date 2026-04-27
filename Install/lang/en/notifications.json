@@ -1,0 +1,32 @@
+{
+    "Notifications": "Notifications",
+    "No notifications": "No notifications",
+    "Mark all as read": "Mark all as read",
+    "View": "View",
+    "Unlimited Credits": "Unlimited Credits",
+    "credits": "credits",
+
+    "Credits Running Low": "Credits Running Low",
+    "You have less than 20% of your monthly credits remaining.": "You have less than 20% of your monthly credits remaining.",
+
+    "Subscription Renewed": "Subscription Renewed",
+    "Your subscription has been renewed successfully.": "Your subscription has been renewed successfully.",
+    "Subscription Expired": "Subscription Expired",
+    "Your subscription has expired.": "Your subscription has expired.",
+
+    "Payment Completed": "Payment Completed",
+    "Your payment has been processed successfully.": "Your payment has been processed successfully.",
+
+    "Domain Verified": "Domain Verified",
+    "Your custom domain has been verified.": "Your custom domain has been verified.",
+    "SSL Certificate Ready": "SSL Certificate Ready",
+    "SSL certificate has been provisioned for your domain.": "SSL certificate has been provisioned for your domain.",
+
+    "just now": "just now",
+    "1 minute ago": "1 minute ago",
+    ":count minutes ago": ":count minutes ago",
+    "1 hour ago": "1 hour ago",
+    ":count hours ago": ":count hours ago",
+    "yesterday": "yesterday",
+    ":count days ago": ":count days ago"
+}

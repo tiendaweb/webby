@@ -1,0 +1,36 @@
+{
+    "suggestions": {
+        "1": "Buat aplikasi manajemen tugas",
+        "2": "Buat situs web portofolio",
+        "3": "Desain halaman landing",
+        "4": "Buat toko e-commerce"
+    },
+    "typing_prompts": {
+        "1": "Buatkan saya situs web portofolio modern dengan mode gelap...",
+        "2": "Buat aplikasi manajemen tugas dengan fitur seret dan lepas...",
+        "3": "Desain halaman landing untuk startup SaaS saya...",
+        "4": "Buat toko e-commerce dengan fungsi keranjang belanja...",
+        "5": "Bangun platform blog dengan dukungan markdown...",
+        "6": "Buat dasbor untuk melacak analitik...",
+        "7": "Desain sistem pemesanan untuk janji temu...",
+        "8": "Bangun feed media sosial dengan scroll tanpa batas..."
+    },
+    "greetings": {
+        "1": "Apa yang ingin kamu bangun, {name}?",
+        "2": "Apa yang harus kita buat, {name}?",
+        "3": "Apa yang ingin kamu ciptakan, {name}?",
+        "4": "Apa yang bisa saya bantu buatkan, {name}?"
+    },
+    "hero_headlines": {
+        "1": "Apa yang akan kamu bangun hari ini?",
+        "2": "Apa yang akan kamu ciptakan hari ini?",
+        "3": "Bangun sesuatu yang luar biasa hari ini",
+        "4": "Wujudkan ide-idemu menjadi kenyataan"
+    },
+    "hero_subtitles": {
+        "1": "Buat situs web menakjubkan dengan mengobrol bersama AI.",
+        "2": "Ubah ide-idemu menjadi situs web dengan AI.",
+        "3": "Bangun situs web indah melalui percakapan.",
+        "4": "Jelaskan visimu dan saksikan menjadi nyata."
+    }
+}

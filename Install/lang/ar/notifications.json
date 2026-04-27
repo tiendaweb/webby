@@ -1,0 +1,32 @@
+{
+    "Notifications": "الإشعارات",
+    "No notifications": "لا توجد إشعارات",
+    "Mark all as read": "تحديد الكل كمقروء",
+    "View": "عرض",
+    "Unlimited Credits": "رصيد غير محدود",
+    "credits": "رصيد",
+
+    "Credits Running Low": "الرصيد على وشك النفاد",
+    "You have less than 20% of your monthly credits remaining.": "لديك أقل من 20% من رصيدك الشهري المتبقي.",
+
+    "Subscription Renewed": "تم تجديد الاشتراك",
+    "Your subscription has been renewed successfully.": "تم تجديد اشتراكك بنجاح.",
+    "Subscription Expired": "انتهى الاشتراك",
+    "Your subscription has expired.": "انتهت صلاحية اشتراكك.",
+
+    "Payment Completed": "اكتمل الدفع",
+    "Your payment has been processed successfully.": "تمت معالجة دفعتك بنجاح.",
+
+    "Domain Verified": "تم التحقق من النطاق",
+    "Your custom domain has been verified.": "تم التحقق من نطاقك المخصص.",
+    "SSL Certificate Ready": "شهادة SSL جاهزة",
+    "SSL certificate has been provisioned for your domain.": "تم توفير شهادة SSL لنطاقك.",
+
+    "just now": "الآن",
+    "1 minute ago": "منذ دقيقة",
+    ":count minutes ago": "منذ :count دقائق",
+    "1 hour ago": "منذ ساعة",
+    ":count hours ago": "منذ :count ساعات",
+    "yesterday": "أمس",
+    ":count days ago": "منذ :count أيام"
+}

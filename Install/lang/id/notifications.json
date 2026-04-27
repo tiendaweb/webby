@@ -1,0 +1,32 @@
+{
+    "Notifications": "Notifikasi",
+    "No notifications": "Tidak ada notifikasi",
+    "Mark all as read": "Tandai semua sudah dibaca",
+    "View": "Lihat",
+    "Unlimited Credits": "Kredit Tak Terbatas",
+    "credits": "kredit",
+
+    "Credits Running Low": "Kredit Hampir Habis",
+    "You have less than 20% of your monthly credits remaining.": "Anda memiliki kurang dari 20% kredit bulanan yang tersisa.",
+
+    "Subscription Renewed": "Langganan Diperpanjang",
+    "Your subscription has been renewed successfully.": "Langganan Anda telah berhasil diperpanjang.",
+    "Subscription Expired": "Langganan Kedaluwarsa",
+    "Your subscription has expired.": "Langganan Anda telah kedaluwarsa.",
+
+    "Payment Completed": "Pembayaran Selesai",
+    "Your payment has been processed successfully.": "Pembayaran Anda telah berhasil diproses.",
+
+    "Domain Verified": "Domain Terverifikasi",
+    "Your custom domain has been verified.": "Domain kustom Anda telah diverifikasi.",
+    "SSL Certificate Ready": "Sertifikat SSL Siap",
+    "SSL certificate has been provisioned for your domain.": "Sertifikat SSL telah diterbitkan untuk domain Anda.",
+
+    "just now": "baru saja",
+    "1 minute ago": "1 menit yang lalu",
+    ":count minutes ago": ":count menit yang lalu",
+    "1 hour ago": "1 jam yang lalu",
+    ":count hours ago": ":count jam yang lalu",
+    "yesterday": "kemarin",
+    ":count days ago": ":count hari yang lalu"
+}

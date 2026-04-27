@@ -1,0 +1,17 @@
+{
+    "name": "PayPal",
+    "slug": "paypal",
+    "description": "Accept recurring payments via PayPal subscriptions",
+    "version": "1.0.0",
+    "author": "Titan Systems",
+    "author_url": "https://titansys.dev",
+    "type": "payment_gateway",
+    "icon": "plugins/paypal/icon.svg",
+    "main_class": "src/PayPalPlugin.php",
+    "namespace": "App\\Plugins\\PaymentGateways\\PayPalPlugin",
+    "requirements": {
+        "php": ">=8.2",
+        "laravel": ">=11.0"
+    },
+    "migrations": []
+}

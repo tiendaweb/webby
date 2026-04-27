@@ -1,0 +1,5 @@
+{
+    "The :attribute field is required.": "Il campo :attribute è obbligatorio.",
+    "The :attribute has already been taken.": "Il valore :attribute è già in uso.",
+    "The selected :attribute is invalid.": "Il valore :attribute selezionato non è valido."
+}

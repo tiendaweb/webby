@@ -1,0 +1,5 @@
+{
+    "The :attribute field is required.": ":attribute は必須です。",
+    "The :attribute has already been taken.": ":attribute はすでに使用されています。",
+    "The selected :attribute is invalid.": "選択された :attribute は無効です。"
+}

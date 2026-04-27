@@ -1,0 +1,5 @@
+{
+    "The :attribute field is required.": ":attribute字段为必填项。",
+    "The :attribute has already been taken.": ":attribute已被占用。",
+    "The selected :attribute is invalid.": "所选:attribute无效。"
+}

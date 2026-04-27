@@ -1,0 +1,5 @@
+{
+    "The :attribute field is required.": "Поле :attribute обязательно.",
+    "The :attribute has already been taken.": ":attribute уже занято.",
+    "The selected :attribute is invalid.": "Выбранное :attribute недействительно."
+}

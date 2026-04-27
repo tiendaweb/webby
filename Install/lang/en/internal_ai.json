@@ -1,0 +1,36 @@
+{
+    "suggestions": {
+        "1": "Build a task management app",
+        "2": "Create a portfolio website",
+        "3": "Design a landing page",
+        "4": "Make an e-commerce store"
+    },
+    "typing_prompts": {
+        "1": "Build me a modern portfolio website with dark mode...",
+        "2": "Create a task management app with drag and drop...",
+        "3": "Design a landing page for my SaaS startup...",
+        "4": "Make an e-commerce store with cart functionality...",
+        "5": "Build a blog platform with markdown support...",
+        "6": "Create a dashboard for tracking analytics...",
+        "7": "Design a booking system for appointments...",
+        "8": "Build a social media feed with infinite scroll..."
+    },
+    "greetings": {
+        "1": "What do you want to build, {name}?",
+        "2": "What should we build, {name}?",
+        "3": "What would you like to create, {name}?",
+        "4": "What can I help you build, {name}?"
+    },
+    "hero_headlines": {
+        "1": "What will you build today?",
+        "2": "What will you create today?",
+        "3": "Build something amazing today",
+        "4": "Turn your ideas into reality"
+    },
+    "hero_subtitles": {
+        "1": "Create stunning websites by chatting with AI.",
+        "2": "Turn your ideas into websites with AI.",
+        "3": "Build beautiful websites through conversation.",
+        "4": "Describe your vision and watch it come to life."
+    }
+}

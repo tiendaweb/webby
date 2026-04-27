@@ -1,0 +1,32 @@
+{
+    "Notifications": "通知",
+    "No notifications": "暂无通知",
+    "Mark all as read": "全部标为已读",
+    "View": "查看",
+    "Unlimited Credits": "无限额度",
+    "credits": "额度",
+
+    "Credits Running Low": "额度即将用完",
+    "You have less than 20% of your monthly credits remaining.": "您的月度额度剩余不足20%。",
+
+    "Subscription Renewed": "订阅已续费",
+    "Your subscription has been renewed successfully.": "您的订阅已成功续费。",
+    "Subscription Expired": "订阅已过期",
+    "Your subscription has expired.": "您的订阅已过期。",
+
+    "Payment Completed": "付款完成",
+    "Your payment has been processed successfully.": "您的付款已成功处理。",
+
+    "Domain Verified": "域名已验证",
+    "Your custom domain has been verified.": "您的自定义域名已通过验证。",
+    "SSL Certificate Ready": "SSL证书已就绪",
+    "SSL certificate has been provisioned for your domain.": "已为您的域名配置SSL证书。",
+
+    "just now": "刚刚",
+    "1 minute ago": "1分钟前",
+    ":count minutes ago": ":count分钟前",
+    "1 hour ago": "1小时前",
+    ":count hours ago": ":count小时前",
+    "yesterday": "昨天",
+    ":count days ago": ":count天前"
+}

@@ -1,0 +1,36 @@
+{
+    "suggestions": {
+        "1": "Erstellen Sie eine Aufgabenverwaltungs-App",
+        "2": "Erstellen Sie eine Portfolio-Website",
+        "3": "Entwerfen Sie eine Landing-Page",
+        "4": "Erstellen Sie einen Online-Shop"
+    },
+    "typing_prompts": {
+        "1": "Erstellen Sie eine moderne Portfolio-Website mit Dark Mode...",
+        "2": "Erstellen Sie eine Aufgabenverwaltungs-App mit Drag & Drop...",
+        "3": "Entwerfen Sie eine Landing-Page für mein SaaS-Startup...",
+        "4": "Erstellen Sie einen E-Commerce-Shop mit Warenkorb...",
+        "5": "Erstellen Sie eine Blog-Plattform mit Markdown-Support...",
+        "6": "Erstellen Sie ein Dashboard zur Analyseverfolgung...",
+        "7": "Entwerfen Sie ein Buchungssystem für Termine...",
+        "8": "Erstellen Sie einen Social-Media-Feed mit Endlos-Scroll..."
+    },
+    "greetings": {
+        "1": "Was möchten Sie erstellen, {name}?",
+        "2": "Was sollen wir erstellen, {name}?",
+        "3": "Was würden Sie gerne erstellen, {name}?",
+        "4": "Wobei kann ich Ihnen helfen, {name}?"
+    },
+    "hero_headlines": {
+        "1": "Was baust du heute?",
+        "2": "Was erstellst du heute?",
+        "3": "Bau etwas Großartiges",
+        "4": "Ideen werden Realität"
+    },
+    "hero_subtitles": {
+        "1": "Erstellen Sie atemberaubende Websites durch Chat mit AI.",
+        "2": "Verwandeln Sie Ihre Ideen mit AI in Websites.",
+        "3": "Erstellen Sie schöne Websites durch Gespräche.",
+        "4": "Beschreiben Sie Ihre Vision und sehen Sie, wie sie lebendig wird."
+    }
+}

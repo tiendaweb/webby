@@ -1,0 +1,256 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "./themes.css";
+
+/* Plugins - use @plugin directive in v4 */
+@plugin "@tailwindcss/forms";
+@plugin "@tailwindcss/typography";
+@plugin "@tailwindcss/container-queries";
+
+/* Source paths for class detection (replaces content array) */
+@source "../js/**/*.tsx";
+@source "../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php";
+@source "../../resources/views/**/*.blade.php";
+
+/* Global base styles - outside @layer in v4 */
+* {
+  border-color: var(--border);
+}
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+}
+
+/* Custom keyframes */
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes blob {
+  0% {
+    transform: translate(0px, 0px) scale(1);
+  }
+  33% {
+    transform: translate(30px, -50px) scale(1.1);
+  }
+  66% {
+    transform: translate(-20px, 20px) scale(0.9);
+  }
+  100% {
+    transform: translate(0px, 0px) scale(1);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes typingDot {
+  0%, 60%, 100% {
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+  30% {
+    transform: translateY(-4px);
+    opacity: 1;
+  }
+}
+
+@keyframes rainbow-wave {
+  0% {
+    background-position: 0% center;
+  }
+  100% {
+    background-position: 200% center;
+  }
+}
+
+@keyframes rainbow-hue {
+  0% {
+    filter: hue-rotate(0deg);
+  }
+  100% {
+    filter: hue-rotate(360deg);
+  }
+}
+
+@keyframes heartbeat {
+  0% {
+    transform: scale(1);
+  }
+  14% {
+    transform: scale(1.2);
+  }
+  28% {
+    transform: scale(1);
+  }
+  42% {
+    transform: scale(1.15);
+  }
+  70% {
+    transform: scale(1);
+  }
+}
+
+@keyframes marquee {
+  0% {
+    transform: translateX(0%);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes marquee-rtl {
+  0% {
+    transform: translateX(0%);
+  }
+  100% {
+    transform: translateX(50%);
+  }
+}
+
+@keyframes collapsible-down {
+  from {
+    height: 0;
+  }
+  to {
+    height: var(--radix-collapsible-content-height);
+  }
+}
+
+@keyframes collapsible-up {
+  from {
+    height: var(--radix-collapsible-content-height);
+  }
+  to {
+    height: 0;
+  }
+}
+
+/* Custom utilities - use @utility directive in v4 */
+@utility shimmer-animation {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(var(--primary-rgb, 59, 130, 246), 0.1) 50%,
+    transparent 100%
+  );
+  animation: shimmer 2s infinite;
+}
+
+@utility animate-blob {
+  animation: blob 10s infinite ease-in-out;
+}
+
+@utility animation-delay-2000 {
+  animation-delay: 2s;
+}
+
+@utility animation-delay-3000 {
+  animation-delay: 3s;
+}
+
+@utility animation-delay-4000 {
+  animation-delay: 4s;
+}
+
+@utility animation-delay-5000 {
+  animation-delay: 5s;
+}
+
+@utility scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@utility animate-fade-in {
+  animation: fadeIn 0.2s ease-out;
+}
+
+@utility animate-rainbow {
+  background: linear-gradient(
+    90deg,
+    #f97316,
+    #eab308,
+    #22c55e,
+    #06b6d4,
+    #3b82f6,
+    #8b5cf6,
+    #ec4899,
+    #f97316
+  );
+  background-size: 200% auto;
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: rainbow-wave 2s linear infinite;
+}
+
+@utility animate-rainbow-icon {
+  color: #3b82f6;
+  animation: rainbow-hue 2s linear infinite, heartbeat 1.5s ease-in-out infinite;
+}
+
+@utility typing-dot {
+  animation: typingDot 1.4s infinite ease-in-out;
+}
+
+@utility animate-marquee {
+  animation: marquee 20s linear infinite;
+}
+
+@utility animate-marquee-slow {
+  animation: marquee 30s linear infinite;
+}
+
+@utility animate-marquee-rtl {
+  animation: marquee-rtl 20s linear infinite;
+}
+
+@utility animate-marquee-rtl-slow {
+  animation: marquee-rtl 30s linear infinite;
+}
+
+@utility animate-collapsible-down {
+  animation: collapsible-down 0.2s ease-out;
+}
+
+@utility animate-collapsible-up {
+  animation: collapsible-up 0.2s ease-out;
+}
+
+/* Typing dot delays - plain CSS classes */
+.typing-dot:nth-child(1) {
+  animation-delay: 0s;
+}
+.typing-dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+.typing-dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+/* Impersonation banner: offset fixed sidebar and sticky headers */
+html[data-impersonating] div:has(> [data-sidebar="sidebar"]) {
+  top: var(--impersonation-banner-height, 0px) !important;
+  height: calc(100svh - var(--impersonation-banner-height, 0px)) !important;
+}
+html[data-impersonating] header.sticky {
+  top: var(--impersonation-banner-height, 0px) !important;
+}

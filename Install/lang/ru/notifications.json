@@ -1,0 +1,32 @@
+{
+    "Notifications": "Уведомления",
+    "No notifications": "Нет уведомлений",
+    "Mark all as read": "Отметить все как прочитанные",
+    "View": "Просмотр",
+    "Unlimited Credits": "Безлимитные кредиты",
+    "credits": "кредитов",
+
+    "Credits Running Low": "Кредиты заканчиваются",
+    "You have less than 20% of your monthly credits remaining.": "У вас осталось менее 20% ежемесячных кредитов.",
+
+    "Subscription Renewed": "Подписка продлена",
+    "Your subscription has been renewed successfully.": "Ваша подписка была успешно продлена.",
+    "Subscription Expired": "Подписка истекла",
+    "Your subscription has expired.": "Срок вашей подписки истёк.",
+
+    "Payment Completed": "Платёж выполнен",
+    "Your payment has been processed successfully.": "Ваш платёж был успешно обработан.",
+
+    "Domain Verified": "Домен подтверждён",
+    "Your custom domain has been verified.": "Ваш пользовательский домен был подтверждён.",
+    "SSL Certificate Ready": "SSL сертификат готов",
+    "SSL certificate has been provisioned for your domain.": "SSL сертификат был выпущен для вашего домена.",
+
+    "just now": "только что",
+    "1 minute ago": "1 минуту назад",
+    ":count minutes ago": ":count минут назад",
+    "1 hour ago": "1 час назад",
+    ":count hours ago": ":count часов назад",
+    "yesterday": "вчера",
+    ":count days ago": ":count дней назад"
+}

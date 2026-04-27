@@ -1,0 +1,32 @@
+{
+    "Notifications": "通知",
+    "No notifications": "通知はありません",
+    "Mark all as read": "すべて既読にする",
+    "View": "表示",
+    "Unlimited Credits": "無制限クレジット",
+    "credits": "クレジット",
+
+    "Credits Running Low": "クレジット残高が少なくなっています",
+    "You have less than 20% of your monthly credits remaining.": "月間クレジットの残りが20%未満です。",
+
+    "Subscription Renewed": "サブスクリプション更新完了",
+    "Your subscription has been renewed successfully.": "サブスクリプションが正常に更新されました。",
+    "Subscription Expired": "サブスクリプション期限切れ",
+    "Your subscription has expired.": "サブスクリプションの有効期限が切れました。",
+
+    "Payment Completed": "支払い完了",
+    "Your payment has been processed successfully.": "お支払いが正常に処理されました。",
+
+    "Domain Verified": "ドメイン確認済み",
+    "Your custom domain has been verified.": "カスタムドメインが確認されました。",
+    "SSL Certificate Ready": "SSL証明書準備完了",
+    "SSL certificate has been provisioned for your domain.": "ドメインのSSL証明書が発行されました。",
+
+    "just now": "たった今",
+    "1 minute ago": "1分前",
+    ":count minutes ago": ":count分前",
+    "1 hour ago": "1時間前",
+    ":count hours ago": ":count時間前",
+    "yesterday": "昨日",
+    ":count days ago": ":count日前"
+}

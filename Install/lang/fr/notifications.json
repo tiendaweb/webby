@@ -1,0 +1,32 @@
+{
+    "Notifications": "Notifications",
+    "No notifications": "Aucune notification",
+    "Mark all as read": "Tout marquer comme lu",
+    "View": "Voir",
+    "Unlimited Credits": "Crédits illimités",
+    "credits": "crédits",
+
+    "Credits Running Low": "Crédits presque épuisés",
+    "You have less than 20% of your monthly credits remaining.": "Il vous reste moins de 20% de vos crédits mensuels.",
+
+    "Subscription Renewed": "Abonnement renouvelé",
+    "Your subscription has been renewed successfully.": "Votre abonnement a été renouvelé avec succès.",
+    "Subscription Expired": "Abonnement expiré",
+    "Your subscription has expired.": "Votre abonnement a expiré.",
+
+    "Payment Completed": "Paiement effectué",
+    "Your payment has been processed successfully.": "Votre paiement a été traité avec succès.",
+
+    "Domain Verified": "Domaine vérifié",
+    "Your custom domain has been verified.": "Votre domaine personnalisé a été vérifié.",
+    "SSL Certificate Ready": "Certificat SSL prêt",
+    "SSL certificate has been provisioned for your domain.": "Un certificat SSL a été provisionné pour votre domaine.",
+
+    "just now": "à l'instant",
+    "1 minute ago": "il y a 1 minute",
+    ":count minutes ago": "il y a :count minutes",
+    "1 hour ago": "il y a 1 heure",
+    ":count hours ago": "il y a :count heures",
+    "yesterday": "hier",
+    ":count days ago": "il y a :count jours"
+}
