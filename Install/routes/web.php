@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AccountDeletionController;
+use App\Http\Controllers\BlankProjectController;
 use App\Http\Controllers\Admin\AdminCronjobController;
 use App\Http\Controllers\Admin\AdminLanguageController;
 use App\Http\Controllers\Admin\AdminPlanController;
@@ -275,6 +276,16 @@ Route::middleware('installed')->group(function () {
         Route::delete('/projects/{project}/force-delete', [ProjectController::class, 'forceDelete'])->withTrashed()->name('projects.force-delete');
     });
 
+    // Blank Projects routes (for static HTML/CSS/JS projects)
+    Route::middleware(['auth', 'verified'])->prefix('api')->group(function () {
+        Route::post('/blank-project/create', [BlankProjectController::class, 'createBlank'])->name('blank-project.create');
+        Route::post('/blank-project/{project}/upload-files', [BlankProjectController::class, 'uploadFiles'])->name('blank-project.upload-files');
+        Route::post('/blank-project/{project}/upload-zip', [BlankProjectController::class, 'uploadZip'])->name('blank-project.upload-zip');
+        Route::get('/blank-project/{project}/files', [BlankProjectController::class, 'getFiles'])->name('blank-project.files');
+        Route::post('/blank-project/{project}/preview', [BlankProjectController::class, 'generatePreview'])->name('blank-project.preview');
+        Route::post('/blank-project/{project}/publish', [BlankProjectController::class, 'publish'])->name('blank-project.publish');
+    });
+
     // File Manager routes
     Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/file-manager', [FileManagerController::class, 'index'])->name('file-manager.index');
@@ -410,6 +421,9 @@ Route::middleware('installed')->group(function () {
         Route::post('languages/{language}/toggle-status', [AdminLanguageController::class, 'toggleStatus'])->name('admin.languages.toggle-status');
         Route::post('languages/{language}/set-default', [AdminLanguageController::class, 'setDefault'])->name('admin.languages.set-default');
         Route::post('languages/reorder', [AdminLanguageController::class, 'reorder'])->name('admin.languages.reorder');
+        Route::get('languages/{language}/files', [AdminLanguageController::class, 'listFiles'])->name('admin.languages.files');
+        Route::get('languages/{language}/files/{file}', [AdminLanguageController::class, 'getFile'])->name('admin.languages.file.get');
+        Route::put('languages/{language}/files/{file}', [AdminLanguageController::class, 'saveFile'])->name('admin.languages.file.save');
 
         // Cronjobs
         Route::get('cronjobs', [AdminCronjobController::class, 'index'])->name('admin.cronjobs');

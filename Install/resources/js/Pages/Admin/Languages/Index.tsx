@@ -30,7 +30,7 @@ import {
     TableActionMenuSeparator,
 } from '@/components/ui/table-action-menu';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Plus, Trash2, Pencil, Star, ToggleLeft, Globe, Check, ChevronsUpDown } from 'lucide-react';
+import { Plus, Trash2, Pencil, Star, ToggleLeft, Globe, Check, ChevronsUpDown, FileText } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import type { AdminLanguagesPageProps, Language } from '@/types/admin';
@@ -537,6 +537,10 @@ export default function Index({ auth, languages, availableLocales }: AdminLangua
                             <TableActionMenuItem onClick={() => handleEdit(language)}>
                                 <Pencil className="me-2 h-4 w-4" />
                                 {t('Edit')}
+                            </TableActionMenuItem>
+                            <TableActionMenuItem onClick={() => router.get(route('admin.languages.files', language.id))}>
+                                <FileText className="me-2 h-4 w-4" />
+                                {t('Edit Translations')}
                             </TableActionMenuItem>
                             <TableActionMenuItem onClick={() => handleToggleStatus(language)}>
                                 <ToggleLeft className="me-2 h-4 w-4" />

@@ -188,4 +188,107 @@ class AdminLanguageController extends Controller
 
         return back()->with('success', __('Languages reordered.'));
     }
+
+    /**
+     * Display the language files editor.
+     */
+    public function listFiles(Language $language): Response
+    {
+        $langPath = lang_path($language->code);
+        $files = [];
+
+        if (is_dir($langPath)) {
+            $jsonFiles = glob($langPath.'/*.json');
+            foreach ($jsonFiles as $file) {
+                $files[] = pathinfo($file, PATHINFO_FILENAME);
+            }
+        }
+
+        sort($files);
+
+        $selectedFile = $files[0] ?? null;
+        $translations = [];
+
+        if ($selectedFile) {
+            $filePath = $langPath.'/'.$selectedFile.'.json';
+            if (file_exists($filePath)) {
+                $content = file_get_contents($filePath);
+                $translations = json_decode($content, true) ?? [];
+            }
+        }
+
+        return Inertia::render('Admin/Languages/EditFiles', [
+            'language' => $language,
+            'files' => $files,
+            'selectedFile' => $selectedFile,
+            'translations' => $translations,
+        ]);
+    }
+
+    /**
+     * Get a language file content.
+     */
+    public function getFile(Language $language, string $file)
+    {
+        if ($redirect = $this->denyIfDemo()) {
+            return response()->json(['error' => 'Demo mode'], 403);
+        }
+
+        $this->validateFileName($file);
+
+        $filePath = lang_path($language->code.'/'.$file.'.json');
+
+        if (!file_exists($filePath)) {
+            return response()->json(['error' => 'File not found'], 404);
+        }
+
+        $content = file_get_contents($filePath);
+        $translations = json_decode($content, true) ?? [];
+
+        return response()->json([
+            'file' => $file,
+            'translations' => $translations,
+        ]);
+    }
+
+    /**
+     * Save language file changes.
+     */
+    public function saveFile(Request $request, Language $language, string $file): RedirectResponse
+    {
+        if ($redirect = $this->denyIfDemo()) {
+            return $redirect;
+        }
+
+        $this->validateFileName($file);
+
+        $validated = $request->validate([
+            'translations' => 'required|array',
+            'translations.*' => 'string',
+        ]);
+
+        $filePath = lang_path($language->code.'/'.$file.'.json');
+
+        if (!file_exists($filePath)) {
+            return back()->withErrors(['file' => __('File not found.')]);
+        }
+
+        $json = json_encode($validated['translations'], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+
+        if (file_put_contents($filePath, $json) === false) {
+            return back()->withErrors(['file' => __('Failed to save file.')]);
+        }
+
+        return back()->with('success', __('Translation file saved successfully.'));
+    }
+
+    /**
+     * Validate filename to prevent path traversal.
+     */
+    private function validateFileName(string $file): void
+    {
+        if (!preg_match('/^[a-zA-Z0-9_-]+$/', $file)) {
+            abort(400, 'Invalid filename');
+        }
+    }
 }
