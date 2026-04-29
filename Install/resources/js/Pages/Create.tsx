@@ -171,6 +171,12 @@ export default function Create({
         });
     };
 
+    const handleCreateStaticProject = () => {
+        router.post('/projects', {
+            project_type: 'static',
+        });
+    };
+
     return (
         <>
             <Head title={t("Create")} />
@@ -281,6 +287,15 @@ export default function Create({
                                         isLoadingSuggestions={isLoadingAi}
                                         templates={templates ?? []}
                                     />
+                                    <div className="mt-4 flex justify-center">
+                                        <button
+                                            type="button"
+                                            onClick={handleCreateStaticProject}
+                                            className="text-sm font-medium text-primary underline underline-offset-4 hover:text-primary/80"
+                                        >
+                                            {t('Proyecto Estático (sin IA)')}
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
 

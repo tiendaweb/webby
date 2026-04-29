@@ -11,6 +11,7 @@ export interface User {
 
 export interface Project {
     id: string;
+    project_type?: 'ai' | 'static';
     name: string;
     description: string | null;
     thumbnail: string | null;
