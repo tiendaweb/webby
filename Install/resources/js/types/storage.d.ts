@@ -94,6 +94,10 @@ export interface DatabasePageProps {
         has_custom_config: boolean;
         collection_prefix: string;
         has_admin_sdk: boolean;
+        database_mode: 'none' | 'firebase' | 'custom_api';
+        db_connected: boolean;
+        db_last_tested_at: string | null;
+        db_last_error: string | null;
     }>;
     firebaseEnabled: boolean;
     canUseOwnConfig: boolean;

@@ -313,6 +313,9 @@ Route::middleware('installed')->group(function () {
         Route::delete('/project/{project}/firebase/config', [ProjectFirebaseController::class, 'resetConfig'])->name('project.firebase.config.reset');
         Route::get('/project/{project}/firebase/rules', [ProjectFirebaseController::class, 'generateRules'])->name('project.firebase.rules');
         Route::post('/project/{project}/firebase/test', [ProjectFirebaseController::class, 'testConnection'])->name('project.firebase.test');
+        Route::get('/project/{project}/database/wizard', [ProjectFirebaseController::class, 'getDatabaseWizard'])->name('project.database.wizard');
+        Route::put('/project/{project}/database/wizard', [ProjectFirebaseController::class, 'saveDatabaseWizard'])->name('project.database.wizard.save');
+        Route::post('/project/{project}/database/wizard/test', [ProjectFirebaseController::class, 'testDatabaseWizard'])->name('project.database.wizard.test');
 
         // Project Firebase Admin SDK routes
         Route::get('/project/{project}/firebase/admin-sdk', [ProjectFirebaseController::class, 'getAdminSdkStatus'])->name('project.firebase.admin-sdk.status');

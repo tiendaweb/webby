@@ -224,3 +224,34 @@ Se añadió una revisión específica de seguridad en `SECURITY_REVIEW.md` con:
 - revisión de controles en endpoints sensibles,
 - estado de auditoría de dependencias,
 - hashes SHA-256 de binarios precompilados.
+
+### Database wizard técnico (por proyecto)
+Se agregaron endpoints para configurar backend de datos por proyecto con un modo explícito en tabla dedicada (`project_database_settings`).
+
+**Entidad:** `project_database_settings`
+- `project_id` (uuid, único)
+- `database_mode` (`none|firebase|custom_api`)
+- `credentials` (JSON encriptado)
+- `base_paths` (JSON)
+- `is_connected` (bool)
+- `last_tested_at` (timestamp)
+- `last_error` (text)
+
+**Endpoints:**
+- `GET /project/{project}/database/wizard`
+  - Devuelve estado actual del wizard (`database_mode`, credenciales mínimas, estado conexión, última prueba, error).
+- `PUT /project/{project}/database/wizard`
+  - Guarda configuración manual.
+  - Body JSON:
+    - `database_mode`: `none|firebase|custom_api`
+    - `credentials`: objeto opcional (para `custom_api`: `api_base_url`, `api_key`, `project_id`)
+    - `base_paths`: array de colecciones/rutas base.
+- `POST /project/{project}/database/wizard/test`
+  - Ejecuta prueba de conexión según modo:
+    - `none`: ok inmediato
+    - `firebase`: usa config efectiva del proyecto
+    - `custom_api`: hace request HTTP al `api_base_url`
+
+**Regla de aislamiento por proyecto:**
+- En `saveDatabaseWizard` se exige que la primera ruta/base path comience con `project_{project_id}` para forzar namespace/prefijo por proyecto.
+

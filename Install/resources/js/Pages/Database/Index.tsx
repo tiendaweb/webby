@@ -321,12 +321,15 @@ export default function DatabaseIndex({ auth, projects, firebaseEnabled, systemF
                                                             {t('Browse and manage Firestore collections')}
                                                         </CardDescription>
                                                     </div>
-                                                    {projectConfig && (
-                                                        <div className="flex items-center gap-2 text-sm text-muted-foreground shrink-0">
-                                                            <span className="h-2 w-2 rounded-full bg-green-500" />
-                                                            {t('Connected')}
+                                                    <div className="text-right text-xs text-muted-foreground shrink-0">
+                                                        <div className="flex items-center justify-end gap-2">
+                                                            <span className={`h-2 w-2 rounded-full ${selectedProject.db_connected ? 'bg-green-500' : 'bg-amber-500'}`} />
+                                                            {selectedProject.db_connected ? t('Connected') : t('Not connected')}
                                                         </div>
-                                                    )}
+                                                        <div>{t('Mode')}: {selectedProject.database_mode}</div>
+                                                        {selectedProject.db_last_tested_at && <div>{t('Last test')}: {new Date(selectedProject.db_last_tested_at).toLocaleString()}</div>}
+                                                        {selectedProject.db_last_error && <div className="text-destructive">{selectedProject.db_last_error}</div>}
+                                                    </div>
                                                 </div>
                                             </CardHeader>
                                             <CardContent>
