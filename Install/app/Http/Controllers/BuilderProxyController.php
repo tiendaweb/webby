@@ -42,6 +42,13 @@ class BuilderProxyController extends Controller
     {
         $this->authorize('update', $project);
 
+        if ($project->isStaticProject()) {
+            return response()->json([
+                'error' => 'Static projects do not support AI build sessions. Upload files directly in the project file manager.',
+                'project_type' => Project::TYPE_STATIC,
+            ], 422);
+        }
+
         // Block demo admin from starting builds
         if (config('app.demo') && Auth::id() === 1) {
             return response()->json([

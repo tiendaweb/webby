@@ -80,14 +80,21 @@ class ProjectController extends Controller
             ]);
         }
 
-        // Check if broadcast is configured AND working (force fresh check)
-        $broadcastService = app(BroadcastService::class);
-        $errorMessage = $broadcastService->getErrorMessage();
+        $projectType = $request->input('project_type', Project::TYPE_AI);
+        if (! in_array($projectType, [Project::TYPE_AI, Project::TYPE_STATIC], true)) {
+            $projectType = Project::TYPE_AI;
+        }
 
-        if ($errorMessage) {
-            return back()->withErrors([
-                'prompt' => $errorMessage,
-            ]);
+        if ($projectType === Project::TYPE_AI) {
+            // Check if broadcast is configured AND working (force fresh check)
+            $broadcastService = app(BroadcastService::class);
+            $errorMessage = $broadcastService->getErrorMessage();
+
+            if ($errorMessage) {
+                return back()->withErrors([
+                    'prompt' => $errorMessage,
+                ]);
+            }
         }
 
         // Check project limit
@@ -102,44 +109,55 @@ class ProjectController extends Controller
             ]);
         }
 
-        // Check if user can perform builds
-        $buildCreditService = app(\App\Services\BuildCreditService::class);
-        $canBuild = $buildCreditService->canPerformBuild($request->user());
+        if ($projectType === Project::TYPE_AI) {
+            // Check if user can perform builds
+            $buildCreditService = app(\App\Services\BuildCreditService::class);
+            $canBuild = $buildCreditService->canPerformBuild($request->user());
 
-        if (! $canBuild['allowed']) {
-            return back()->withErrors([
-                'prompt' => $canBuild['reason'],
-            ]);
-        }
+            if (! $canBuild['allowed']) {
+                return back()->withErrors([
+                    'prompt' => $canBuild['reason'],
+                ]);
+            }
 
-        // Block concurrent builds for the same user
-        $activeBuild = Project::where('user_id', $request->user()->id)
-            ->where('build_status', 'building')
-            ->exists();
+            // Block concurrent builds for the same user
+            $activeBuild = Project::where('user_id', $request->user()->id)
+                ->where('build_status', 'building')
+                ->exists();
 
-        if ($activeBuild) {
-            return back()->withErrors([
-                'prompt' => 'You have an active session. Wait for it to complete, or stop it.',
-            ]);
+            if ($activeBuild) {
+                return back()->withErrors([
+                    'prompt' => 'You have an active session. Wait for it to complete, or stop it.',
+                ]);
+            }
         }
 
         $validated = $request->validate([
-            'prompt' => 'required|string|max:2000',
+            'prompt' => 'required_if:project_type,ai|nullable|string|max:2000',
             'template_id' => 'nullable|integer|exists:templates,id',
             'theme_preset' => 'nullable|string|in:default,arctic,summer,fragrant,slate,feminine,forest,midnight,coral,mocha,ocean,ruby',
+            'project_type' => 'nullable|string|in:ai,static',
         ]);
 
         // Generate a name from the prompt (first 50 chars)
-        $name = str($validated['prompt'])->limit(50, '...')->toString();
+        $name = $projectType === Project::TYPE_STATIC
+            ? 'Static Project '.now()->format('Y-m-d H:i')
+            : str($validated['prompt'])->limit(50, '...')->toString();
 
         $project = Project::create([
             'user_id' => $request->user()->id,
             'name' => $name,
-            'initial_prompt' => $validated['prompt'],
+            'project_type' => $projectType,
+            'initial_prompt' => $projectType === Project::TYPE_AI ? $validated['prompt'] : null,
             'template_id' => $validated['template_id'] ?? null,
             'theme_preset' => $validated['theme_preset'] ?? null,
             'last_viewed_at' => now(),
         ]);
+
+        if ($projectType === Project::TYPE_STATIC) {
+            return redirect()->route('project.files.index', $project)
+                ->with('message', 'Static project created. You can now upload your files.');
+        }
 
         return redirect()->route('chat', $project);
     }

@@ -15,9 +15,14 @@ class Project extends Model
 {
     use HasFactory, HasUuids, SoftDeletes;
 
+    public const TYPE_AI = 'ai';
+
+    public const TYPE_STATIC = 'static';
+
     protected $fillable = [
         'user_id',
         'template_id',
+        'project_type',
         'name',
         'description',
         'initial_prompt',
@@ -77,6 +82,11 @@ class Project extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function isStaticProject(): bool
+    {
+        return $this->project_type === self::TYPE_STATIC;
     }
 
     /**
