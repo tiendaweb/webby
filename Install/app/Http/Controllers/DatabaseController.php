@@ -25,6 +25,7 @@ class DatabaseController extends Controller
 
         // Get user's projects that have Firebase enabled
         $projects = $user->projects()
+            ->with('databaseSetting')
             ->orderBy('updated_at', 'desc')
             ->get()
             ->map(fn ($project) => [
@@ -34,6 +35,10 @@ class DatabaseController extends Controller
                 'has_custom_config' => ! $project->uses_system_firebase && ! empty($project->firebase_config),
                 'collection_prefix' => $project->getFirebaseCollectionPrefix(),
                 'has_admin_sdk' => $project->canUseAdminSdk(),
+                'database_mode' => $project->databaseSetting?->database_mode ?? 'none',
+                'db_connected' => $project->databaseSetting?->is_connected ?? false,
+                'db_last_tested_at' => $project->databaseSetting?->last_tested_at?->toISOString(),
+                'db_last_error' => $project->databaseSetting?->last_error,
             ]);
 
         // Get Firebase feature status

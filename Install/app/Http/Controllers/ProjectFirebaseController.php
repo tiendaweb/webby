@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Project;
+use App\Models\ProjectDatabaseSetting;
 use App\Services\FirebaseAdminService;
 use App\Services\FirebaseService;
 use Illuminate\Http\JsonResponse;
@@ -189,7 +190,119 @@ class ProjectFirebaseController extends Controller
         return response()->json($result);
     }
 
-    /**
+    
+    public function getDatabaseWizard(Project $project): JsonResponse
+    {
+        Gate::authorize('view', $project);
+
+        $setting = $project->databaseSetting;
+
+        return response()->json([
+            'database_mode' => $setting?->database_mode ?? 'none',
+            'credentials' => $setting?->credentials ?? [],
+            'base_paths' => $setting?->base_paths ?? [],
+            'is_connected' => $setting?->is_connected ?? false,
+            'last_tested_at' => $setting?->last_tested_at?->toISOString(),
+            'last_error' => $setting?->last_error,
+        ]);
+    }
+
+    public function saveDatabaseWizard(Project $project, Request $request): JsonResponse
+    {
+        Gate::authorize('update', $project);
+
+        $validated = $request->validate([
+            'database_mode' => 'required|in:none,firebase,custom_api',
+            'credentials' => 'nullable|array',
+            'credentials.api_base_url' => 'nullable|required_if:database_mode,custom_api|url',
+            'credentials.api_key' => 'nullable|string|max:2048',
+            'credentials.project_id' => 'nullable|string|max:255',
+            'base_paths' => 'nullable|array',
+            'base_paths.*' => 'string|max:255',
+        ]);
+
+        $basePaths = array_values(array_filter($validated['base_paths'] ?? []));
+        if (($validated['database_mode'] ?? 'none') !== 'none' && count($basePaths) === 0) {
+            return response()->json(['error' => 'At least one base path/collection is required.'], 422);
+        }
+
+        if (! empty($basePaths) && ! str_starts_with($basePaths[0], 'project_'.$project->id)) {
+            return response()->json(['error' => 'The first base path must start with project_'.$project->id.' to enforce project namespace isolation.'], 422);
+        }
+
+        $setting = ProjectDatabaseSetting::updateOrCreate(
+            ['project_id' => $project->id],
+            [
+                'database_mode' => $validated['database_mode'],
+                'credentials' => $validated['credentials'] ?? [],
+                'base_paths' => $basePaths,
+                'last_error' => null,
+            ]
+        );
+
+        return response()->json([
+            'message' => 'Database wizard configuration saved.',
+            'setting' => $setting,
+        ]);
+    }
+
+    public function testDatabaseWizard(Project $project, Request $request): JsonResponse
+    {
+        Gate::authorize('view', $project);
+
+        $validated = $request->validate([
+            'database_mode' => 'required|in:none,firebase,custom_api',
+            'credentials' => 'nullable|array',
+        ]);
+
+        $mode = $validated['database_mode'];
+        $credentials = $validated['credentials'] ?? [];
+        $success = false;
+        $error = null;
+
+        if ($mode === 'none') {
+            $success = true;
+        } elseif ($mode === 'firebase') {
+            $config = $this->firebaseService->getConfig($project);
+            if ($config) {
+                $result = $this->firebaseService->testConnection($config);
+                $success = (bool) ($result['success'] ?? false);
+                $error = $result['error'] ?? null;
+            } else {
+                $error = 'No Firebase configuration available for this project.';
+            }
+        } elseif ($mode === 'custom_api') {
+            $url = $credentials['api_base_url'] ?? null;
+            if (! $url) {
+                $error = 'api_base_url is required for custom_api mode.';
+            } else {
+                try {
+                    $response = \Illuminate\Support\Facades\Http::timeout(10)->get(rtrim($url, '/'));
+                    $success = $response->successful();
+                    if (! $success) {
+                        $error = 'Custom API responded with status '.$response->status();
+                    }
+                } catch (\Throwable $e) {
+                    $error = $e->getMessage();
+                }
+            }
+        }
+
+        $setting = ProjectDatabaseSetting::firstOrCreate(['project_id' => $project->id], ['database_mode' => $mode]);
+        $setting->update([
+            'database_mode' => $mode,
+            'is_connected' => $success,
+            'last_tested_at' => now(),
+            'last_error' => $success ? null : $error,
+        ]);
+
+        return response()->json([
+            'success' => $success,
+            'error' => $error,
+            'last_tested_at' => $setting->last_tested_at?->toISOString(),
+        ]);
+    }
+/**
      * Get Admin SDK status for a project.
      */
     public function getAdminSdkStatus(Project $project): JsonResponse
