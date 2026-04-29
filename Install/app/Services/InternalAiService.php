@@ -24,6 +24,7 @@ class InternalAiService
         AiProvider::TYPE_GROK => 'grok-4-1-fast-non-reasoning',
         AiProvider::TYPE_DEEPSEEK => 'deepseek-chat',
         AiProvider::TYPE_ZHIPU => 'glm-4.5-air',
+        AiProvider::TYPE_GEMINI => 'gemini-2.5-flash',
     ];
 
     /**
@@ -337,7 +338,8 @@ PROMPT;
         return match ($provider->type) {
             AiProvider::TYPE_OPENAI,
             AiProvider::TYPE_GROK,
-            AiProvider::TYPE_DEEPSEEK => $this->callOpenAiCompatible($provider, $model, $prompt),
+            AiProvider::TYPE_DEEPSEEK,
+            AiProvider::TYPE_GEMINI => $this->callOpenAiCompatible($provider, $model, $prompt),
 
             AiProvider::TYPE_ANTHROPIC,
             AiProvider::TYPE_ZHIPU => $this->callAnthropic($provider, $model, $prompt),

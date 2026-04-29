@@ -22,6 +22,7 @@ class AiProviderFactory extends Factory
         $type = fake()->randomElement([
             AiProvider::TYPE_OPENAI,
             AiProvider::TYPE_ANTHROPIC,
+            AiProvider::TYPE_GEMINI,
         ]);
 
         return [
@@ -102,6 +103,25 @@ class AiProviderFactory extends Factory
     /**
      * Create a ZhipuAI provider.
      */
+
+    /**
+     * Create a Gemini provider.
+     */
+    public function gemini(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'name' => 'Google Gemini',
+            'type' => AiProvider::TYPE_GEMINI,
+            'config' => [
+                'base_url' => AiProvider::DEFAULT_BASE_URLS[AiProvider::TYPE_GEMINI],
+                'default_model' => 'gemini-2.5-pro',
+                'max_tokens' => 8192,
+                'summarizer_max_tokens' => 1500,
+            ],
+            'available_models' => AiProvider::DEFAULT_MODELS[AiProvider::TYPE_GEMINI],
+        ]);
+    }
+
     public function zhipu(): static
     {
         return $this->state(fn (array $attributes) => [
