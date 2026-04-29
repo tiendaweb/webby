@@ -23,6 +23,8 @@ class Project extends Model
     protected $fillable = [
         'user_id',
         'template_id',
+        'chat_template_id',
+        'chat_template_snapshot',
         'project_type',
         'name',
         'description',
@@ -67,6 +69,7 @@ class Project extends Model
             'last_viewed_at' => 'datetime',
             'build_started_at' => 'datetime',
             'build_completed_at' => 'datetime',
+            'chat_template_snapshot' => 'array',
             'conversation_history' => 'array',
             'compacted_history' => 'array',
             'estimated_tokens' => 'integer',
@@ -96,6 +99,11 @@ class Project extends Model
     public function template(): BelongsTo
     {
         return $this->belongsTo(Template::class);
+    }
+
+    public function chatTemplate(): BelongsTo
+    {
+        return $this->belongsTo(ChatTemplate::class);
     }
 
     /**

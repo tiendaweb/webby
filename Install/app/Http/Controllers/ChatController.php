@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ChatTemplate;
 use App\Models\Project;
 use App\Models\SystemSetting;
 use App\Services\FirebaseService;
@@ -139,12 +140,57 @@ class ChatController extends Controller
             'firebase' => $firebaseSettings,
             'storage' => $storageSettings,
             'projectFiles' => $projectFiles,
+            'chatTemplates' => ChatTemplate::query()->where(function ($q) use ($user) {
+                $q->where('user_id', $user->id)->orWhereIn('visibility', ['account', 'team']);
+            })->latest()->get(['id', 'name', 'starter_prompt', 'variables_json', 'provider_preferences']),
             'buildCredits' => [
                 'remaining' => $user->getRemainingBuildCredits(),
                 'monthlyLimit' => $user->getMonthlyBuildCreditsAllocation(),
                 'isUnlimited' => $user->hasUnlimitedCredits(),
                 'usingOwnKey' => $user->isUsingOwnAiApiKey(),
             ],
+        ]);
+    }
+
+
+    public function startFromTemplate(Request $request, Project $project): JsonResponse
+    {
+        $this->authorize('update', $project);
+
+        $data = $request->validate([
+            'chat_template_id' => 'required|exists:chat_templates,id',
+            'variables' => 'nullable|array',
+        ]);
+
+        $template = ChatTemplate::findOrFail($data['chat_template_id']);
+
+        $basePrompt = $template->starter_prompt ?? '';
+        $variables = $data['variables'] ?? [];
+
+        foreach ($variables as $key => $value) {
+            $basePrompt = str_replace('{{'.$key.'}}', (string) $value, $basePrompt);
+        }
+
+        $project->update([
+            'chat_template_id' => $template->id,
+            'chat_template_snapshot' => [
+                'name' => $template->name,
+                'system_prompt' => $template->system_prompt,
+                'starter_prompt' => $template->starter_prompt,
+                'variables' => $variables,
+                'provider_preferences' => $template->provider_preferences,
+            ],
+            'initial_prompt' => $basePrompt,
+        ]);
+
+        if (! empty($basePrompt)) {
+            $project->addMessageToHistory('user', $basePrompt);
+        }
+
+        return response()->json([
+            'success' => true,
+            'initial_prompt' => $basePrompt,
+            'provider_preferences' => $template->provider_preferences,
         ]);
     }
 

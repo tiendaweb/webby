@@ -231,6 +231,11 @@ Route::middleware('installed')->group(function () {
         Route::get('/project/{project}', [ChatController::class, 'show'])->name('chat');
         Route::post('/project/send', [ChatController::class, 'send'])->name('chat.send');
         Route::get('/project/{project}/suggestions', [ChatController::class, 'suggestions'])->name('chat.suggestions');
+        Route::post('/project/{project}/start-from-template', [ChatController::class, 'startFromTemplate'])->name('chat.start-template');
+        Route::get('/chat/templates', [ChatTemplateController::class, 'index'])->name('chat.templates.index');
+        Route::post('/chat/templates', [ChatTemplateController::class, 'store'])->name('chat.templates.store');
+        Route::put('/chat/templates/{chatTemplate}', [ChatTemplateController::class, 'update'])->name('chat.templates.update');
+        Route::delete('/chat/templates/{chatTemplate}', [ChatTemplateController::class, 'destroy'])->name('chat.templates.destroy');
     });
 
     // Project Settings
