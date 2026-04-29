@@ -273,6 +273,14 @@ export default function DatabaseIndex({ auth, projects, firebaseEnabled, systemF
                                             <p className="text-muted-foreground mt-1">
                                                 {t('Manage your Firebase Firestore data')}
                                             </p>
+                                            <a
+                                                href="/Documentation/#/database-static-api"
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="mt-2 inline-flex text-sm text-primary hover:underline"
+                                            >
+                                                {t('View static frontend + API architecture guide')}
+                                            </a>
                                         </div>
 
                                         {projects.length > 0 && (
