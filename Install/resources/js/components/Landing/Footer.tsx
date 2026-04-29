@@ -19,7 +19,7 @@ export function Footer() {
                 <div className="flex flex-col items-center text-center space-y-8">
                     {/* Logo */}
                     <Link href="/" className="flex-shrink-0 text-start">
-                        <ApplicationLogo showText size="lg" />
+                        <ApplicationLogo showText size="md" />
                     </Link>
 
                     {/* Tagline */}

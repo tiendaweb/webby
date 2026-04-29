@@ -17,61 +17,61 @@ export default function Privacy({ auth, canLogin, canRegister }: LegalPageProps)
             <Navbar auth={auth} canLogin={canLogin} canRegister={canRegister} />
             <main className="pt-24 pb-16">
                 <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <h1 className="text-3xl font-bold mb-8">Privacy Policy</h1>
+                    <h1 className="text-3xl font-bold mb-8">Política de Privacidad</h1>
 
                     <div className="prose prose-sm dark:prose-invert max-w-none space-y-6">
                         <p className="text-muted-foreground">
-                            Last updated: January 2026
+                            Última actualización: enero 2026
                         </p>
 
                         <section>
-                            <h2 className="text-xl font-semibold mt-8 mb-4">1. Information We Collect</h2>
+                            <h2 className="text-xl font-semibold mt-8 mb-4">1. Información que recopilamos</h2>
                             <p>
-                                We collect information you provide directly to us, such as when you create an account,
-                                use our services, or contact us for support. This may include your name, email address,
-                                and any other information you choose to provide.
+                                Recopilamos información que nos proporcionás directamente, como cuando creás una cuenta,
+                                utilizás nuestros servicios o nos contactás para obtener soporte. Esto puede incluir tu nombre, dirección de correo electrónico,
+                                y cualquier otra información que elijas proporcionarnos.
                             </p>
                         </section>
 
                         <section>
-                            <h2 className="text-xl font-semibold mt-8 mb-4">2. How We Use Your Information</h2>
+                            <h2 className="text-xl font-semibold mt-8 mb-4">2. Cómo usamos tu información</h2>
                             <p>
-                                We use the information we collect to provide, maintain, and improve our services,
-                                to process transactions, send you technical notices and support messages, and to
-                                respond to your comments and questions.
+                                Utilizamos la información que recopilamos para proporcionar, mantener y mejorar nuestros servicios,
+                                procesar transacciones, enviarte notificaciones técnicas y mensajes de soporte, y
+                                responder a tus comentarios y preguntas.
                             </p>
                         </section>
 
                         <section>
-                            <h2 className="text-xl font-semibold mt-8 mb-4">3. Information Sharing</h2>
+                            <h2 className="text-xl font-semibold mt-8 mb-4">3. Compartir información</h2>
                             <p>
-                                We do not share your personal information with third parties except as described
-                                in this policy. We may share information with vendors, consultants, and other
-                                service providers who need access to such information to carry out work on our behalf.
+                                No compartimos tu información personal con terceros excepto según se describe
+                                en esta política. Podemos compartir información con proveedores, consultores y otros
+                                proveedores de servicios que necesitan acceso a tal información para realizar trabajos en nuestro nombre.
                             </p>
                         </section>
 
                         <section>
-                            <h2 className="text-xl font-semibold mt-8 mb-4">4. Data Security</h2>
+                            <h2 className="text-xl font-semibold mt-8 mb-4">4. Seguridad de datos</h2>
                             <p>
-                                We take reasonable measures to help protect your personal information from loss,
-                                theft, misuse, unauthorized access, disclosure, alteration, and destruction.
+                                Tomamos medidas razonables para ayudar a proteger tu información personal de pérdida,
+                                robo, mal uso, acceso no autorizado, divulgación, alteración y destrucción.
                             </p>
                         </section>
 
                         <section>
-                            <h2 className="text-xl font-semibold mt-8 mb-4">5. Your Rights</h2>
+                            <h2 className="text-xl font-semibold mt-8 mb-4">5. Tus derechos</h2>
                             <p>
-                                You may access, update, or delete your account information at any time by logging
-                                into your account settings. You may also contact us to request access to, correction
-                                of, or deletion of any personal information.
+                                Podés acceder, actualizar o eliminar la información de tu cuenta en cualquier momento iniciando sesión
+                                en la configuración de tu cuenta. También podés contactarnos para solicitar acceso, corrección
+                                o eliminación de cualquier información personal.
                             </p>
                         </section>
 
                         <section>
-                            <h2 className="text-xl font-semibold mt-8 mb-4">6. Contact Us</h2>
+                            <h2 className="text-xl font-semibold mt-8 mb-4">6. Contáctanos</h2>
                             <p>
-                                If you have any questions about this Privacy Policy, please contact us at{' '}
+                                Si tenés preguntas sobre esta Política de Privacidad, contáctanos en{' '}
                                 {contactEmail}.
                             </p>
                         </section>

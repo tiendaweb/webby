@@ -15,8 +15,15 @@ interface UseBuildCreditsReturn {
     update: (credits: BuildCreditsInfo) => void;
 }
 
-export function useBuildCredits(initialCredits: BuildCreditsInfo): UseBuildCreditsReturn {
-    const [credits, setCredits] = useState<BuildCreditsInfo>(initialCredits);
+const defaultCredits: BuildCreditsInfo = {
+    remaining: 0,
+    monthlyLimit: 0,
+    isUnlimited: false,
+    usingOwnKey: false,
+};
+
+export function useBuildCredits(initialCredits: BuildCreditsInfo | null): UseBuildCreditsReturn {
+    const [credits, setCredits] = useState<BuildCreditsInfo>(initialCredits || defaultCredits);
     const [isRefreshing, setIsRefreshing] = useState(false);
 
     const refresh = useCallback(async () => {

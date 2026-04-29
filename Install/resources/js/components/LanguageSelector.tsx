@@ -22,6 +22,12 @@ export function LanguageSelector() {
     const containerRef = useRef<HTMLDivElement>(null);
     const dropdownRef = useRef<HTMLDivElement>(null);
 
+    // Debug logs
+    useEffect(() => {
+        console.log('🗣️ LanguageSelector - Current Locale:', locale);
+        console.log('🗣️ LanguageSelector - Available Languages:', availableLanguages.map(l => l.code + ' (' + l.native_name + ')'));
+    }, [locale, availableLanguages]);
+
     const currentLanguage = availableLanguages.find((l) => l.code === locale);
 
     // Calculate dropdown position based on available space

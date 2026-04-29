@@ -1,7 +1,7 @@
 import { usePage } from '@inertiajs/react';
 import { HTMLAttributes, useState, useEffect } from 'react';
 import { PageProps, ColorTheme } from '@/types';
-import { Paintbrush } from 'lucide-react';
+import { Sparkles } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
 
 interface ApplicationLogoProps extends HTMLAttributes<HTMLDivElement> {
@@ -175,14 +175,14 @@ export default function ApplicationLogo({
         <div className={`flex items-center gap-3 ${className || ''}`} {...props}>
             <div className="relative group">
                 <div className={`${containerSizeClasses[size]} bg-gradient-to-br ${colors.gradient} rounded-2xl flex items-center justify-center shadow-lg ${colors.shadow} ${colors.shadowDark} ${colors.hoverShadow} ${colors.hoverShadowDark} transition-all duration-300 group-hover:scale-105`}>
-                    <Paintbrush className={`${iconSizeClasses[size]} text-white`} />
+                    <Sparkles className={`${iconSizeClasses[size]} text-white`} />
                 </div>
                 <div className={`absolute -top-0.5 -right-0.5 ${dotSizeClasses[size]} bg-green-500 rounded-full border-2 border-background`} />
             </div>
             {showText && (
                 <div>
-                    <span className={`font-bold bg-gradient-to-r ${colors.textGradient} ${colors.textGradientDark} bg-clip-text text-transparent ${textSizeClasses[size]}`}>
-                        {siteName}
+                    <span className={`font-bold text-foreground ${textSizeClasses[size]}`}>
+                        AAPP HOST
                     </span>
                     {siteTagline && (size === 'lg' || size === 'md') && (
                         <p className="text-[10px] font-medium text-muted-foreground">{siteTagline}</p>

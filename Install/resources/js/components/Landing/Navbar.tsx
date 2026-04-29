@@ -70,7 +70,7 @@ export function Navbar({ auth, canLogin, canRegister, enabledSectionTypes = [] }
                 <div className="flex items-center justify-between h-16">
                     {/* Logo */}
                     <Link href="/" className="flex-shrink-0">
-                        <ApplicationLogo showText size="lg" />
+                        <ApplicationLogo showText size="md" />
                     </Link>
 
                     {/* Desktop Navigation */}
