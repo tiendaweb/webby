@@ -21,12 +21,15 @@ class AiProvider extends Model
 
     const TYPE_ZHIPU = 'zhipu';
 
+    const TYPE_GEMINI = 'gemini';
+
     const TYPES = [
         self::TYPE_OPENAI => 'OpenAI',
         self::TYPE_ANTHROPIC => 'Anthropic',
         self::TYPE_GROK => 'Grok',
         self::TYPE_DEEPSEEK => 'DeepSeek',
         self::TYPE_ZHIPU => 'ZhipuAI',
+        self::TYPE_GEMINI => 'Google Gemini',
     ];
 
     const DEFAULT_MODELS = [
@@ -47,6 +50,10 @@ class AiProvider extends Model
             'glm-5',
             'glm-4.7',
             'glm-4.5-air',
+        ],
+        self::TYPE_GEMINI => [
+            'gemini-2.5-pro',
+            'gemini-2.5-flash',
         ],
     ];
 
@@ -80,6 +87,10 @@ class AiProvider extends Model
             'glm-4.7' => ['input' => 0, 'output' => 0],
             'glm-4.5-air' => ['input' => 0, 'output' => 0],
         ],
+        self::TYPE_GEMINI => [
+            'gemini-2.5-pro' => ['input' => 1.25, 'output' => 10.00],
+            'gemini-2.5-flash' => ['input' => 0.30, 'output' => 2.50],
+        ],
     ];
 
     /**
@@ -93,6 +104,7 @@ class AiProvider extends Model
         self::TYPE_GROK => 'https://api.x.ai/v1',
         self::TYPE_DEEPSEEK => 'https://api.deepseek.com',
         self::TYPE_ZHIPU => 'https://api.z.ai/api/anthropic',
+        self::TYPE_GEMINI => 'https://generativelanguage.googleapis.com/v1beta/openai',
     ];
 
     protected $fillable = [
@@ -178,6 +190,7 @@ class AiProvider extends Model
         return $models[0] ?? match ($this->type) {
             self::TYPE_ANTHROPIC => 'claude-sonnet-4-5',
             self::TYPE_ZHIPU => 'glm-5',
+            self::TYPE_GEMINI => 'gemini-2.5-pro',
             default => 'gpt-5.2',
         };
     }
@@ -213,6 +226,8 @@ class AiProvider extends Model
                     return $this->testDeepSeekConnection();
                 case self::TYPE_ZHIPU:
                     return $this->testZhipuConnection();
+                case self::TYPE_GEMINI:
+                    return $this->testGeminiConnection();
 
                 default:
                     return ['success' => false, 'message' => 'Unknown provider type'];
@@ -320,6 +335,30 @@ class AiProvider extends Model
             'x-api-key' => $this->getApiKey(),
             'anthropic-version' => '2023-06-01',
         ])->post($this->getBaseUrl().'/v1/messages', [
+            'model' => $this->getDefaultModel(),
+            'max_tokens' => 1,
+            'messages' => [['role' => 'user', 'content' => 'Hi']],
+        ]);
+
+        if ($response->successful()) {
+            return ['success' => true, 'message' => 'Connection successful'];
+        }
+
+        return [
+            'success' => false,
+            'message' => $response->json('error.message', 'Connection failed'),
+        ];
+    }
+
+
+    /**
+     * Test Gemini API connection.
+     */
+    protected function testGeminiConnection(): array
+    {
+        $response = Http::withHeaders([
+            'Authorization' => 'Bearer '.$this->getApiKey(),
+        ])->post($this->getBaseUrl().'/chat/completions', [
             'model' => $this->getDefaultModel(),
             'max_tokens' => 1,
             'messages' => [['role' => 'user', 'content' => 'Hi']],
