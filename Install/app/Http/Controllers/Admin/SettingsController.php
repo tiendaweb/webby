@@ -14,6 +14,7 @@ use App\Services\InternalAiService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Cache;
 use Inertia\Inertia;
 
 class SettingsController extends Controller
@@ -64,15 +65,18 @@ class SettingsController extends Controller
             'landing_page_enabled' => 'boolean',
             'default_currency' => 'required|string|size:3|in:'.implode(',', \App\Helpers\CurrencyHelper::getSupportedCurrencies()),
             'sentry_enabled' => 'nullable|boolean',
-            'purchase_code' => 'nullable|string|max:255',
+            // DESHABILITADO: 'purchase_code' => 'nullable|string|max:255',
         ]);
 
-        // Don't overwrite purchase code if empty (keep existing)
-        if (empty($validated['purchase_code'])) {
-            unset($validated['purchase_code']);
-        }
+        // DESHABILITADO: Purchase code validation removed
+        // if (empty($validated['purchase_code'])) {
+        //     unset($validated['purchase_code']);
+        // }
 
         SystemSetting::setMany($validated, 'general');
+
+        // Clear cache
+        Cache::forget('settings.group.general');
 
         return back()->with('success', 'General settings updated successfully.');
     }
@@ -159,6 +163,9 @@ class SettingsController extends Controller
         $this->setNullableIntegerSetting('default_ai_provider_id', $validated, 'plans');
         $this->setNullableIntegerSetting('default_builder_id', $validated, 'plans');
 
+        // Clear cache
+        Cache::forget('settings.group.plans');
+
         return back()->with('success', 'Plans settings updated successfully.');
     }
 
@@ -200,6 +207,9 @@ class SettingsController extends Controller
 
         SystemSetting::setMany($validated, 'auth');
 
+        // Clear cache
+        Cache::forget('settings.group.auth');
+
         return back()->with('success', 'Authentication settings updated successfully.');
     }
 
@@ -231,6 +241,9 @@ class SettingsController extends Controller
         }
 
         SystemSetting::setMany($validated, 'email');
+
+        // Clear cache
+        Cache::forget('settings.group.email');
 
         return back()->with('success', 'Email settings updated successfully.');
     }
@@ -290,6 +303,9 @@ class SettingsController extends Controller
 
         SystemSetting::setMany($validated, 'gdpr');
 
+        // Clear cache
+        Cache::forget('settings.group.gdpr');
+
         return back()->with('success', 'Privacy settings updated successfully.');
     }
 
@@ -309,13 +325,13 @@ class SettingsController extends Controller
             'site_favicon' => $settings['site_favicon'] ?? null,
             'default_theme' => $settings['default_theme'] ?? 'system',
             'color_theme' => $settings['color_theme'] ?? 'neutral',
-            'default_locale' => $settings['default_locale'] ?? 'en',
+            'default_locale' => $settings['default_locale'] ?? config('app.locale', 'es'),
             'timezone' => $settings['timezone'] ?? 'UTC',
             'date_format' => $settings['date_format'] ?? 'Y-m-d',
             'landing_page_enabled' => $settings['landing_page_enabled'] ?? true,
             'default_currency' => $settings['default_currency'] ?? 'USD',
             'sentry_enabled' => $settings['sentry_enabled'] ?? false,
-            'purchase_code_configured' => ! empty($settings['purchase_code']),
+            // DESHABILITADO: 'purchase_code_configured' => ! empty($settings['purchase_code']),
         ];
     }
 
@@ -404,7 +420,8 @@ class SettingsController extends Controller
 
         SystemSetting::setMany($validated, 'domains');
 
-        // Clear domain settings cache
+        // Clear caches
+        Cache::forget('settings.group.domains');
         \App\Services\DomainSettingService::clearCache();
 
         return back()->with('success', 'Domain settings updated successfully.');
@@ -428,6 +445,9 @@ class SettingsController extends Controller
         ]);
 
         SystemSetting::setMany($validated, 'referral');
+
+        // Clear cache
+        Cache::forget('settings.group.referral');
 
         return back()->with('success', 'Referral settings updated successfully.');
     }
@@ -598,6 +618,7 @@ class SettingsController extends Controller
         SystemSetting::setMany($validated, 'integrations');
 
         // Clear caches when settings change
+        Cache::forget('settings.group.integrations');
         InternalAiService::clearAllCache();
         BroadcastService::clearCache();
 

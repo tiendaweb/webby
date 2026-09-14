@@ -11,11 +11,11 @@ export default function Admin() {
     const [submitting, setSubmitting] = useState(false);
 
     return (
-        <InstallerLayout currentStep={4} title="Site & Admin Setup">
-            <Head title="Admin Setup" />
+        <InstallerLayout currentStep={4} title="Configuración del sitio y administrador">
+            <Head title="Configuración de administrador" />
 
             <p className="text-center text-muted-foreground mb-6">
-                Configure your site name and create the administrator account.
+                Configura el nombre de tu sitio y crea la cuenta de administrador.
             </p>
 
             {errors.error && (
@@ -32,12 +32,12 @@ export default function Admin() {
             >
                 <input type="hidden" name="_token" value={(usePage().props as unknown as { csrf_token: string }).csrf_token} />
                 <div className="space-y-2">
-                    <Label htmlFor="site_name">Site Name</Label>
+                    <Label htmlFor="site_name">Nombre del sitio</Label>
                     <Input
                         id="site_name"
                         name="site_name"
                         defaultValue=""
-                        placeholder="My Website Builder"
+                        placeholder="Mi creador de sitios"
                         autoFocus
                     />
                     {errors.site_name && (
@@ -48,12 +48,12 @@ export default function Admin() {
                 <hr className="border-border" />
 
                 <div className="space-y-2">
-                    <Label htmlFor="name">Admin Name</Label>
+                    <Label htmlFor="name">Nombre del administrador</Label>
                     <Input
                         id="name"
                         name="name"
                         defaultValue=""
-                        placeholder="John Doe"
+                        placeholder="Juan Pérez"
                     />
                     {errors.name && (
                         <p className="text-sm text-destructive">{errors.name}</p>
@@ -61,13 +61,13 @@ export default function Admin() {
                 </div>
 
                 <div className="space-y-2">
-                    <Label htmlFor="email">Admin Email</Label>
+                    <Label htmlFor="email">Correo del administrador</Label>
                     <Input
                         id="email"
                         name="email"
                         type="email"
                         defaultValue=""
-                        placeholder="admin@example.com"
+                        placeholder="admin@ejemplo.com"
                     />
                     {errors.email && (
                         <p className="text-sm text-destructive">{errors.email}</p>
@@ -75,7 +75,7 @@ export default function Admin() {
                 </div>
 
                 <div className="space-y-2">
-                    <Label htmlFor="password">Password</Label>
+                    <Label htmlFor="password">Contraseña</Label>
                     <Input
                         id="password"
                         name="password"
@@ -88,7 +88,7 @@ export default function Admin() {
                 </div>
 
                 <div className="space-y-2">
-                    <Label htmlFor="password_confirmation">Confirm Password</Label>
+                    <Label htmlFor="password_confirmation">Confirmar contraseña</Label>
                     <Input
                         id="password_confirmation"
                         name="password_confirmation"
@@ -102,6 +102,7 @@ export default function Admin() {
 
                 <hr className="border-border" />
 
+                {/* DESHABILITADO: Purchase Code Field
                 <div className="space-y-2">
                     <Label htmlFor="purchase_code">Envato Purchase Code <span className="text-muted-foreground text-xs">(Optional)</span></Label>
                     <Input
@@ -117,15 +118,16 @@ export default function Admin() {
                         <p className="text-sm text-destructive">{errors.purchase_code}</p>
                     )}
                 </div>
+                */}
 
                 <div className="flex gap-3 pt-4">
                     <a href={route('install.database')} className="flex-1">
                         <Button variant="outline" className="w-full" type="button">
-                            Back
+                            Atrás
                         </Button>
                     </a>
                     <Button type="submit" className="flex-1" disabled={submitting}>
-                        {submitting ? 'Installing...' : 'Complete Installation'}
+                        {submitting ? 'Instalando...' : 'Completar instalación'}
                     </Button>
                 </div>
             </form>

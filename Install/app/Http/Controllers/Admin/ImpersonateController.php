@@ -45,7 +45,7 @@ class ImpersonateController extends Controller
 
         $request->session()->regenerate();
 
-        return redirect('/create');
+        return redirect()->route('projects.index');
     }
 
     /**

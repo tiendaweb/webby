@@ -35,6 +35,14 @@ class AdminCronjobController extends Controller
                 'description' => __('Expire overdue subscriptions and send renewal reminders'),
             ],
             [
+                'name' => __('Manage AI Connector Activations'),
+                'class' => 'App\Console\Commands\ManageAiConnectorActivations',
+                'command' => 'ai-connector:manage',
+                'schedule' => __('Daily'),
+                'cron' => '0 0 * * *',
+                'description' => __('Expire overdue AI Connector module activations and revoke their tokens'),
+            ],
+            [
                 'name' => __('Reset Build Credits'),
                 'class' => 'App\Console\Commands\ResetBuildCredits',
                 'command' => 'credits:reset',

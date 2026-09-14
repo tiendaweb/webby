@@ -118,7 +118,7 @@ class ProjectFile extends Model
      */
     public function getStoragePath(): string
     {
-        return "project-files/{$this->project_id}/{$this->filename}";
+        return $this->path ?: "project-files/{$this->project_id}/{$this->filename}";
     }
 
     /**

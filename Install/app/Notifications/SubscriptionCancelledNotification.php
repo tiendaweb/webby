@@ -49,7 +49,7 @@ class SubscriptionCancelledNotification extends Notification implements ShouldQu
                 ->view('emails.user.subscription-cancelled', array_merge($emailData, [
                     'planName' => $plan?->name ?? 'N/A',
                     'accessUntil' => $endsAt?->format('F j, Y') ?? 'Immediately',
-                    'dashboardUrl' => route('create'),
+                    'dashboardUrl' => route('projects.index'),
                 ]));
         });
     }

@@ -15,7 +15,11 @@ function FlagIcon({ code, className }: { code: string; className?: string }) {
     return <FlagComponent className={cn('h-4 w-5 rounded-sm', className)} />;
 }
 
-export function LanguageSelector() {
+interface LanguageSelectorProps {
+    align?: 'start' | 'end';
+}
+
+export function LanguageSelector({ align = 'end' }: LanguageSelectorProps) {
     const { locale, availableLanguages, setLocale } = useLanguage();
     const [isOpen, setIsOpen] = useState(false);
     const [position, setPosition] = useState<'bottom' | 'top'>('bottom');
@@ -109,7 +113,8 @@ export function LanguageSelector() {
                     ref={dropdownRef}
                     role="menu"
                     className={cn(
-                        'absolute end-0 z-50 min-w-[8rem] max-h-[300px] overflow-y-auto overflow-x-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md animate-in fade-in-0 zoom-in-95',
+                        'absolute z-50 min-w-[8rem] max-h-[300px] overflow-y-auto overflow-x-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md animate-in fade-in-0 zoom-in-95',
+                        align === 'start' ? 'start-0 end-auto' : 'end-0',
                         position === 'bottom' ? 'top-full mt-1' : 'bottom-full mb-1'
                     )}
                 >

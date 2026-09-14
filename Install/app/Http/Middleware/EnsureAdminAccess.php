@@ -18,7 +18,7 @@ class EnsureAdminAccess
         }
 
         if (! $request->user()->isAdmin()) {
-            return redirect('/create');
+            return redirect()->route('projects.index');
         }
 
         return $next($request);

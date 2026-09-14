@@ -1,4 +1,5 @@
 export { AnimatedSection } from './AnimatedSection';
+export { AnimatedBackground } from './AnimatedBackground';
 export { Navbar } from './Navbar';
 export { HeroSection } from './HeroSection';
 export { SocialProof } from './SocialProof';

@@ -158,6 +158,7 @@ class AdminPlanController extends Controller
             'max_file_size_mb' => 'nullable|integer|min:1|max:500',
             'allowed_file_types' => 'nullable|array',
             'allowed_file_types.*' => 'string',
+            'enable_php_runtime' => 'boolean',
         ]);
 
         $plan = Plan::create([
@@ -191,6 +192,7 @@ class AdminPlanController extends Controller
             'max_storage_mb' => $validated['max_storage_mb'] ?? null,
             'max_file_size_mb' => $validated['max_file_size_mb'] ?? 10,
             'allowed_file_types' => $validated['allowed_file_types'] ?? null,
+            'enable_php_runtime' => $validated['enable_php_runtime'] ?? true,
         ]);
 
         app(AdminStatsService::class)->clearCache();
@@ -241,6 +243,7 @@ class AdminPlanController extends Controller
             'max_file_size_mb' => 'nullable|integer|min:1|max:500',
             'allowed_file_types' => 'nullable|array',
             'allowed_file_types.*' => 'string',
+            'enable_php_runtime' => 'boolean',
         ]);
 
         $plan->update([
@@ -274,6 +277,7 @@ class AdminPlanController extends Controller
             'max_storage_mb' => $validated['max_storage_mb'] ?? $plan->max_storage_mb,
             'max_file_size_mb' => $validated['max_file_size_mb'] ?? $plan->max_file_size_mb,
             'allowed_file_types' => $validated['allowed_file_types'] ?? $plan->allowed_file_types,
+            'enable_php_runtime' => $validated['enable_php_runtime'] ?? false,
         ]);
 
         app(AdminStatsService::class)->clearCache();

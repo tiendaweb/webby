@@ -21,7 +21,7 @@ class SystemSettingSeeder extends Seeder
             ['key' => 'site_logo_dark', 'value' => null, 'type' => 'string', 'group' => 'general'],
             ['key' => 'site_favicon', 'value' => null, 'type' => 'string', 'group' => 'general'],
             ['key' => 'default_theme', 'value' => 'system', 'type' => 'string', 'group' => 'general'],
-            ['key' => 'default_locale', 'value' => 'en', 'type' => 'string', 'group' => 'general'],
+            ['key' => 'default_locale', 'value' => 'es', 'type' => 'string', 'group' => 'general'],
             ['key' => 'color_theme', 'value' => 'neutral', 'type' => 'string', 'group' => 'general'],
             ['key' => 'timezone', 'value' => 'UTC', 'type' => 'string', 'group' => 'general'],
             ['key' => 'date_format', 'value' => 'Y-m-d', 'type' => 'string', 'group' => 'general'],

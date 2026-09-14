@@ -376,7 +376,9 @@ export default function TransactionDetails({
                     <DialogHeader>
                         <DialogTitle>{t('Approve Transaction')}</DialogTitle>
                         <DialogDescription>
-                            {t('Approve this bank transfer payment. This will activate the associated subscription.')}
+                            {transaction.payment_method === 'manual'
+                                ? t('Confirm this manual purchase. This will activate the associated plan and its AI credits.')
+                                : t('Approve this bank transfer payment. This will activate the associated subscription.')}
                         </DialogDescription>
                     </DialogHeader>
                     <div className="grid gap-4 py-4">

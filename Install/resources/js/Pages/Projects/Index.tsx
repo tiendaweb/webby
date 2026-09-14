@@ -1,5 +1,5 @@
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo, FormEvent } from 'react';
 import { usePageLoading } from '@/hooks/usePageLoading';
 import { useTranslation } from '@/contexts/LanguageContext';
 import { ProjectsSkeleton } from './ProjectsSkeleton';
@@ -36,6 +36,15 @@ import {
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import {
     Select,
     SelectContent,
     SelectItem,
@@ -43,6 +52,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { AppSidebar } from '@/components/Sidebar/AppSidebar';
+import { AnimatedBackground } from '@/components/Landing/AnimatedBackground';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { LanguageSelector } from '@/components/LanguageSelector';
 import { NotificationBell } from '@/components/Notifications/NotificationBell';
@@ -62,36 +72,147 @@ import {
     Star,
     StarOff,
     Copy,
+    Pencil,
     Trash2,
     RotateCcw,
     ChevronLeft,
     ChevronRight,
+    Plus,
+    Code2,
+    Zap,
+    Upload,
+    Loader2,
+    ImagePlus,
+    RefreshCw,
 } from 'lucide-react';
+import axios from 'axios';
+import { toPng } from 'html-to-image';
 
 type ViewMode = 'grid' | 'list' | 'large';
+type PaginationItem = number | 'ellipsis';
+
+interface ThumbnailCaptureTarget {
+    id: string;
+    name: string;
+    previewUrl: string;
+    nonce: number;
+}
+
+interface ThumbnailCaptureFrameProps {
+    target: ThumbnailCaptureTarget | null;
+    onGenerated: (projectId: string, path?: string) => void;
+    onError: (projectId: string, message?: string) => void;
+}
+
+function ThumbnailCaptureFrame({ target, onGenerated, onError }: ThumbnailCaptureFrameProps) {
+    const iframeRef = useRef<HTMLIFrameElement>(null);
+    const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    useEffect(() => {
+        return () => {
+            if (timeoutRef.current) {
+                clearTimeout(timeoutRef.current);
+            }
+        };
+    }, []);
+
+    const clearPendingCapture = useCallback(() => {
+        if (timeoutRef.current) {
+            clearTimeout(timeoutRef.current);
+            timeoutRef.current = null;
+        }
+    }, []);
+
+    const handleLoad = useCallback(() => {
+        if (!target) return;
+
+        clearPendingCapture();
+        const currentTarget = target;
+
+        timeoutRef.current = setTimeout(async () => {
+            try {
+                const iframeDoc = iframeRef.current?.contentDocument;
+                if (!iframeDoc?.body) {
+                    throw new Error('Preview is not ready.');
+                }
+
+                await iframeDoc.fonts?.ready;
+
+                const dataUrl = await toPng(iframeDoc.body, {
+                    width: 800,
+                    height: 600,
+                    canvasWidth: 800,
+                    canvasHeight: 600,
+                    cacheBust: true,
+                });
+
+                const response = await axios.post<{ success: boolean; path?: string }>(`/project/${currentTarget.id}/thumbnail`, {
+                    image: dataUrl,
+                });
+
+                onGenerated(currentTarget.id, response.data.path);
+            } catch (error: any) {
+                onError(currentTarget.id, error?.response?.data?.message || error?.message);
+            }
+        }, 1200);
+    }, [clearPendingCapture, onError, onGenerated, target]);
+
+    useEffect(() => {
+        clearPendingCapture();
+    }, [target, clearPendingCapture]);
+
+    if (!target) {
+        return null;
+    }
+
+    const separator = target.previewUrl.includes('?') ? '&' : '?';
+
+    return (
+        <div aria-hidden className="fixed left-[-10000px] top-0 h-[600px] w-[800px] overflow-hidden opacity-0 pointer-events-none">
+            <iframe
+                ref={iframeRef}
+                key={`${target.id}-${target.nonce}`}
+                src={`${target.previewUrl}${separator}thumbnail=${target.nonce}`}
+                title={`Thumbnail preview for ${target.name}`}
+                className="h-[600px] w-[800px] border-0"
+                sandbox="allow-scripts allow-same-origin"
+                onLoad={handleLoad}
+            />
+        </div>
+    );
+}
 
 interface ProjectCardProps {
     project: Project;
     isTrash?: boolean;
     thumbnailUrl?: string | null;
+    isGeneratingThumbnail?: boolean;
+    canGenerateThumbnail?: boolean;
     onToggleStar?: (id: string) => void;
+    onRename?: (project: Project) => void;
     onDuplicate?: (id: string) => void;
     onDelete?: (project: Project) => void;
     onRestore?: (id: string) => void;
     onPermanentDelete?: (id: string) => void;
+    onGenerateThumbnail?: (project: Project) => void;
 }
 
 function ProjectCard({
     project,
     isTrash = false,
     thumbnailUrl,
+    isGeneratingThumbnail = false,
+    canGenerateThumbnail = false,
     onToggleStar,
+    onRename,
     onDuplicate,
     onDelete,
     onRestore,
     onPermanentDelete,
+    onGenerateThumbnail,
 }: ProjectCardProps) {
     const { t } = useTranslation();
+    const hasThumbnail = Boolean(thumbnailUrl);
 
     const formatEditedTime = (dateString: string) => {
         const date = new Date(dateString);
@@ -107,7 +228,7 @@ function ProjectCard({
     return (
         <div className="group relative">
             <Link href={isTrash ? '#' : `/project/${project.id}`} className={isTrash ? 'pointer-events-none' : ''}>
-                <div className="aspect-[4/3] rounded-xl border bg-card overflow-hidden mb-3 hover:shadow-lg transition-shadow">
+                <div className="relative aspect-[4/3] rounded-xl border bg-card overflow-hidden mb-3 hover:shadow-lg transition-shadow">
                     {thumbnailUrl ? (
                         <img
                             src={thumbnailUrl}
@@ -117,6 +238,14 @@ function ProjectCard({
                     ) : (
                         <div className="w-full h-full flex items-center justify-center bg-muted/50">
                             <Folder className="h-12 w-12 text-muted-foreground/30" />
+                        </div>
+                    )}
+                    {isGeneratingThumbnail && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-background/75 backdrop-blur-sm">
+                            <div className="flex items-center gap-2 rounded-md bg-background px-3 py-2 text-xs font-medium shadow-sm">
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                {t('Generating thumbnail')}
+                            </div>
                         </div>
                     )}
                 </div>
@@ -155,9 +284,27 @@ function ProjectCard({
                                     </>
                                 )}
                             </TableActionMenuItem>
+                            <TableActionMenuItem onClick={() => onRename?.(project)}>
+                                <Pencil className="h-4 w-4 me-2" />
+                                {t('Rename')}
+                            </TableActionMenuItem>
                             <TableActionMenuItem onClick={() => onDuplicate?.(project.id)}>
                                 <Copy className="h-4 w-4 me-2" />
                                 {t('Duplicate')}
+                            </TableActionMenuItem>
+                            <TableActionMenuItem
+                                onClick={() => onGenerateThumbnail?.(project)}
+                                disabled={!canGenerateThumbnail || isGeneratingThumbnail}
+                                className={!canGenerateThumbnail ? 'opacity-50' : undefined}
+                            >
+                                {isGeneratingThumbnail ? (
+                                    <Loader2 className="h-4 w-4 me-2 animate-spin" />
+                                ) : hasThumbnail ? (
+                                    <RefreshCw className="h-4 w-4 me-2" />
+                                ) : (
+                                    <ImagePlus className="h-4 w-4 me-2" />
+                                )}
+                                {hasThumbnail ? t('Regenerate thumbnail') : t('Generate thumbnail')}
                             </TableActionMenuItem>
                             <TableActionMenuSeparator />
                             <TableActionMenuItem
@@ -218,6 +365,10 @@ export default function ProjectsIndex({ auth, projects, counts, activeTab, filte
 
     // Real-time project status updates
     const [projectStatuses, setProjectStatuses] = useState<Record<string, Project['build_status']>>({});
+    const [thumbnailQueue, setThumbnailQueue] = useState<ThumbnailCaptureTarget[]>([]);
+    const [activeThumbnailTarget, setActiveThumbnailTarget] = useState<ThumbnailCaptureTarget | null>(null);
+    const [generatingThumbnailIds, setGeneratingThumbnailIds] = useState<Set<string>>(() => new Set());
+    const [generatedThumbnailOverrides, setGeneratedThumbnailOverrides] = useState<Record<string, { path: string; timestamp: number }>>({});
 
     // Subscribe to user channel for real-time updates
     useUserChannel({
@@ -251,6 +402,10 @@ export default function ProjectsIndex({ auth, projects, counts, activeTab, filte
 
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [projectToDelete, setProjectToDelete] = useState<string | null>(null);
+    const [renameDialogOpen, setRenameDialogOpen] = useState(false);
+    const [projectToRename, setProjectToRename] = useState<Project | null>(null);
+    const [renameValue, setRenameValue] = useState('');
+    const [isRenaming, setIsRenaming] = useState(false);
     const [trashDialogOpen, setTrashDialogOpen] = useState(false);
     const [projectToTrash, setProjectToTrash] = useState<string | null>(null);
     const [projectToTrashInfo, setProjectToTrashInfo] = useState<{
@@ -259,6 +414,9 @@ export default function ProjectsIndex({ auth, projects, counts, activeTab, filte
     } | null>(null);
     const [searchValue, setSearchValue] = useState(filters.search || '');
     const searchTimeout = useRef<NodeJS.Timeout | null>(null);
+    const [isDraggingHtml, setIsDraggingHtml] = useState(false);
+    const [isCreatingFromDrop, setIsCreatingFromDrop] = useState(false);
+    const dragCounter = useRef(0);
     const [viewMode, setViewMode] = useState<ViewMode>(() => {
         if (typeof window !== 'undefined') {
             return (localStorage.getItem('projects-view') as ViewMode) || 'grid';
@@ -273,24 +431,126 @@ export default function ProjectsIndex({ auth, projects, counts, activeTab, filte
 
     // Helper function to get thumbnail URL with cache busting
     const getThumbnailUrl = useCallback((project: Project): string | null => {
-        if (!project.thumbnail) return null;
+        const override = generatedThumbnailOverrides[project.id];
+        const thumbnail = override?.path || project.thumbnail;
+
+        if (!thumbnail) return null;
+
         // Cache buster based on updated_at
-        const cacheBuster = project.updated_at ? `?v=${new Date(project.updated_at).getTime()}` : '';
+        const cacheVersion = override?.timestamp || (project.updated_at ? new Date(project.updated_at).getTime() : null);
+        const cacheBuster = cacheVersion ? `?v=${cacheVersion}` : '';
+
         // If already a full URL, return as-is
-        if (project.thumbnail.startsWith('http')) {
-            return project.thumbnail + cacheBuster;
+        if (thumbnail.startsWith('http')) {
+            return thumbnail + cacheBuster;
         }
-        if (project.thumbnail.startsWith('/storage/')) {
-            return project.thumbnail + cacheBuster;
+        if (thumbnail.startsWith('/storage/')) {
+            return thumbnail + cacheBuster;
         }
         // Prepend /storage/ for local storage paths
-        return `/storage/${project.thumbnail}${cacheBuster}`;
-    }, []);
+        return `/storage/${thumbnail}${cacheBuster}`;
+    }, [generatedThumbnailOverrides]);
+
+    useEffect(() => {
+        if (activeThumbnailTarget || thumbnailQueue.length === 0) {
+            return;
+        }
+
+        const [nextTarget, ...remainingTargets] = thumbnailQueue;
+        setActiveThumbnailTarget(nextTarget);
+        setThumbnailQueue(remainingTargets);
+    }, [activeThumbnailTarget, thumbnailQueue]);
+
+    const enqueueThumbnailTargets = useCallback((targets: ThumbnailCaptureTarget[]) => {
+        if (targets.length === 0) {
+            return;
+        }
+
+        setGeneratingThumbnailIds(prev => {
+            const next = new Set(prev);
+            targets.forEach(target => next.add(target.id));
+            return next;
+        });
+
+        setThumbnailQueue(prev => {
+            const queuedIds = new Set(prev.map(target => target.id));
+            if (activeThumbnailTarget) {
+                queuedIds.add(activeThumbnailTarget.id);
+            }
+
+            const uniqueTargets = targets.filter(target => !queuedIds.has(target.id));
+            return [...prev, ...uniqueTargets];
+        });
+    }, [activeThumbnailTarget]);
+
+    const handleGenerateThumbnail = useCallback((project: Project) => {
+        if (!project.preview_url) {
+            toast.error(t('Build or open the project preview before generating a thumbnail.'));
+            return;
+        }
+
+        if (generatingThumbnailIds.has(project.id)) {
+            return;
+        }
+
+        enqueueThumbnailTargets([{
+            id: project.id,
+            name: project.name,
+            previewUrl: project.preview_url,
+            nonce: Date.now(),
+        }]);
+    }, [enqueueThumbnailTargets, generatingThumbnailIds, t]);
+
+    const handleGenerateMissingThumbnails = useCallback(() => {
+        const targets = projects.data
+            .filter(project => !getThumbnailUrl(project) && project.preview_url && !generatingThumbnailIds.has(project.id))
+            .map((project, index) => ({
+                id: project.id,
+                name: project.name,
+                previewUrl: project.preview_url as string,
+                nonce: Date.now() + index,
+            }));
+
+        if (targets.length === 0) {
+            toast.info(t('No visible projects need thumbnails.'));
+            return;
+        }
+
+        enqueueThumbnailTargets(targets);
+        toast.info(t('Generating thumbnails for :count projects', { count: targets.length }));
+    }, [enqueueThumbnailTargets, generatingThumbnailIds, getThumbnailUrl, projects.data, t]);
+
+    const handleThumbnailGenerated = useCallback((projectId: string, path?: string) => {
+        if (path) {
+            setGeneratedThumbnailOverrides(prev => ({
+                ...prev,
+                [projectId]: { path, timestamp: Date.now() },
+            }));
+        }
+
+        setGeneratingThumbnailIds(prev => {
+            const next = new Set(prev);
+            next.delete(projectId);
+            return next;
+        });
+        setActiveThumbnailTarget(null);
+        toast.success(t('Thumbnail generated'));
+    }, [t]);
+
+    const handleThumbnailError = useCallback((projectId: string, message?: string) => {
+        setGeneratingThumbnailIds(prev => {
+            const next = new Set(prev);
+            next.delete(projectId);
+            return next;
+        });
+        setActiveThumbnailTarget(null);
+        toast.error(message || t('Failed to generate thumbnail'));
+    }, [t]);
 
     // Handle filter changes with URL navigation
-    const handleFilterChange = useCallback((newFilters: Partial<{ search?: string; sort?: ProjectSort; visibility?: ProjectVisibility | null }>) => {
+    const handleFilterChange = useCallback((newFilters: Partial<{ search?: string; sort?: ProjectSort; visibility?: ProjectVisibility | null; per_page?: number }>) => {
         const url = activeTab === 'trash' ? '/projects/trash' : '/projects';
-        const params: Record<string, string> = {};
+        const params: Record<string, string | number> = {};
 
         // Preserve tab for non-trash
         if (activeTab !== 'trash' && activeTab !== 'all') {
@@ -311,6 +571,9 @@ export default function ProjectsIndex({ auth, projects, counts, activeTab, filte
             if (visibilityVal) params.visibility = visibilityVal;
         }
 
+        const perPageVal = newFilters.per_page !== undefined ? newFilters.per_page : filters.per_page;
+        if (perPageVal && perPageVal !== 12) params.per_page = perPageVal;
+
         router.get(url, params, { preserveState: true, preserveScroll: true });
     }, [activeTab, filters]);
 
@@ -328,10 +591,18 @@ export default function ProjectsIndex({ auth, projects, counts, activeTab, filte
     };
 
     const handleTabChange = (tab: string) => {
+        const params: Record<string, string | number> = {};
+        if (filters.per_page && filters.per_page !== 12) {
+            params.per_page = filters.per_page;
+        }
+
         if (tab === 'trash') {
-            router.visit('/projects/trash');
+            router.get('/projects/trash', params);
         } else {
-            router.visit(`/projects?tab=${tab}`);
+            if (tab !== 'all') {
+                params.tab = tab;
+            }
+            router.get('/projects', params);
         }
     };
 
@@ -341,6 +612,10 @@ export default function ProjectsIndex({ auth, projects, counts, activeTab, filte
 
     const handleVisibilityChange = (visibility: string) => {
         handleFilterChange({ visibility: visibility === 'any' ? null : visibility as ProjectVisibility });
+    };
+
+    const handlePerPageChange = (perPage: string) => {
+        handleFilterChange({ per_page: Number(perPage) });
     };
 
     const handlePageChange = (page: number) => {
@@ -353,6 +628,7 @@ export default function ProjectsIndex({ auth, projects, counts, activeTab, filte
         if (filters.search) params.search = filters.search;
         if (filters.sort && filters.sort !== 'last-edited') params.sort = filters.sort;
         if (filters.visibility && activeTab !== 'trash') params.visibility = filters.visibility;
+        if (filters.per_page && filters.per_page !== 12) params.per_page = filters.per_page;
 
         router.get(url, params, { preserveState: true, preserveScroll: true });
     };
@@ -362,6 +638,35 @@ export default function ProjectsIndex({ auth, projects, counts, activeTab, filte
             preserveScroll: true,
             onSuccess: () => toast.success(t('Project updated')),
             onError: () => toast.error(t('Failed to update project')),
+        });
+    };
+
+    const handleRename = (project: Project) => {
+        setProjectToRename(project);
+        setRenameValue(project.name);
+        setRenameDialogOpen(true);
+    };
+
+    const submitRename = (e: FormEvent) => {
+        e.preventDefault();
+
+        if (!projectToRename || renameValue.trim() === '') {
+            return;
+        }
+
+        setIsRenaming(true);
+        router.put(`/projects/${projectToRename.id}/rename`, {
+            name: renameValue.trim(),
+        }, {
+            preserveScroll: true,
+            onSuccess: () => {
+                toast.success(t('Project renamed'));
+                setRenameDialogOpen(false);
+                setProjectToRename(null);
+                setRenameValue('');
+            },
+            onError: () => toast.error(t('Failed to rename project')),
+            onFinish: () => setIsRenaming(false),
         });
     };
 
@@ -400,6 +705,70 @@ export default function ProjectsIndex({ auth, projects, counts, activeTab, filte
         });
     };
 
+    const extractHtmlTitle = (html: string): string => {
+        const match = html.match(/<title[^>]*>([^<]*)<\/title>/i);
+        return match ? match[1].trim() : '';
+    };
+
+    const isHtmlDrag = (e: React.DragEvent) =>
+        Array.from(e.dataTransfer.items).some(
+            (item) => item.kind === 'file' && (item.type === 'text/html' || item.type === '')
+        );
+
+    const handleDragEnter = (e: React.DragEvent) => {
+        e.preventDefault();
+        dragCounter.current++;
+        if (isHtmlDrag(e)) setIsDraggingHtml(true);
+    };
+
+    const handleDragLeave = (e: React.DragEvent) => {
+        e.preventDefault();
+        dragCounter.current--;
+        if (dragCounter.current === 0) setIsDraggingHtml(false);
+    };
+
+    const handleDragOver = (e: React.DragEvent) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'copy';
+    };
+
+    const handleDrop = async (e: React.DragEvent) => {
+        e.preventDefault();
+        dragCounter.current = 0;
+        setIsDraggingHtml(false);
+
+        const file = Array.from(e.dataTransfer.files).find(
+            (f) => f.name.endsWith('.html') || f.name.endsWith('.htm') || f.type === 'text/html'
+        );
+
+        if (!file) return;
+
+        setIsCreatingFromDrop(true);
+        try {
+            const html = await file.text();
+            const title = extractHtmlTitle(html) || file.name.replace(/\.html?$/i, '');
+
+            const response = await axios.post('/api/blank-project/code', { name: title, html });
+            toast.success(t('Project created from HTML file'));
+            router.visit(response.data.redirect_url || `/project/${response.data.project.id}`);
+        } catch (err: any) {
+            toast.error(err?.response?.data?.error || t('Failed to create project from file'));
+        } finally {
+            setIsCreatingFromDrop(false);
+        }
+    };
+
+    const handleCreateBlankProject = () => {
+        router.post(route('blank-project.create'), {
+            name: `${t('Manual Hosting Project')} ${new Date().toLocaleDateString()}`,
+        }, {
+            onSuccess: () => {
+                toast.success(t('Manual hosting project created successfully'));
+            },
+            onError: () => toast.error(t('Failed to create project')),
+        });
+    };
+
     const handleRestore = (id: string) => {
         router.post(`/projects/${id}/restore`, {}, {
             onSuccess: () => toast.success(t('Project restored')),
@@ -433,7 +802,7 @@ export default function ProjectsIndex({ auth, projects, counts, activeTab, filte
             case 'trash':
                 return t('Trash is empty.');
             default:
-                return t('No projects yet. Create your first project from the dashboard!');
+                return t('No projects yet. Create your first project to get started.');
         }
     };
 
@@ -449,15 +818,63 @@ export default function ProjectsIndex({ auth, projects, counts, activeTab, filte
         }
     };
 
+    const currentPerPage = String(filters.per_page ?? projects.per_page ?? 12);
+    const visibleMissingThumbnailCount = projects.data.filter(
+        project => !getThumbnailUrl(project) && project.preview_url && !generatingThumbnailIds.has(project.id)
+    ).length;
+    const paginationItems = useMemo<PaginationItem[]>(() => {
+        const total = projects.last_page;
+        const current = projects.current_page;
+
+        if (total <= 7) {
+            return Array.from({ length: total }, (_, index) => index + 1);
+        }
+
+        const pages = new Set<number>([1, total, current, current - 1, current + 1]);
+
+        if (current <= 4) {
+            [2, 3, 4, 5].forEach(page => pages.add(page));
+        }
+
+        if (current >= total - 3) {
+            [total - 4, total - 3, total - 2, total - 1].forEach(page => pages.add(page));
+        }
+
+        const sortedPages = Array.from(pages)
+            .filter(page => page >= 1 && page <= total)
+            .sort((a, b) => a - b);
+
+        const items: PaginationItem[] = [];
+        let previousPage = 0;
+
+        sortedPages.forEach(page => {
+            if (previousPage > 0 && page - previousPage > 1) {
+                items.push('ellipsis');
+            }
+            items.push(page);
+            previousPage = page;
+        });
+
+        return items;
+    }, [projects.current_page, projects.last_page]);
+
     return (
         <>
             <Head title={t('My Projects')} />
 
+            <ThumbnailCaptureFrame
+                target={activeThumbnailTarget}
+                onGenerated={handleThumbnailGenerated}
+                onError={handleThumbnailError}
+            />
+
             <TooltipProvider>
                 <SidebarProvider>
                     <AppSidebar user={user} />
-                    <SidebarInset>
-                        <div className="min-h-screen bg-background">
+                    <SidebarInset className="bg-transparent">
+                        <div className="relative min-h-screen bg-background">
+                            <AnimatedBackground />
+
                             {/* Header */}
                             <header className="sticky top-0 z-50 flex h-[60px] items-center justify-between border-b bg-background/80 backdrop-blur-sm px-4">
                                 <div className="flex items-center gap-2">
@@ -508,7 +925,31 @@ export default function ProjectsIndex({ auth, projects, counts, activeTab, filte
                             </header>
 
                             {/* Main Content */}
-                            <main className="p-4 md:p-6 lg:p-8">
+                            <main
+                                className="relative z-10 p-4 md:p-6 lg:p-8"
+                                onDragEnter={handleDragEnter}
+                                onDragLeave={handleDragLeave}
+                                onDragOver={handleDragOver}
+                                onDrop={handleDrop}
+                            >
+                                {/* HTML drag overlay */}
+                                {isDraggingHtml && (
+                                    <div className="absolute inset-0 z-50 flex items-center justify-center bg-primary/10 border-2 border-dashed border-primary rounded-xl pointer-events-none">
+                                        <div className="text-center">
+                                            <Upload className="h-12 w-12 text-primary mx-auto mb-3" />
+                                            <p className="text-lg font-semibold text-primary">{t('Drop HTML file to create project')}</p>
+                                        </div>
+                                    </div>
+                                )}
+                                {/* Creating from drop overlay */}
+                                {isCreatingFromDrop && (
+                                    <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/80 rounded-xl">
+                                        <div className="text-center">
+                                            <Loader2 className="h-10 w-10 animate-spin text-primary mx-auto mb-3" />
+                                            <p className="text-sm text-muted-foreground">{t('Creating project...')}</p>
+                                        </div>
+                                    </div>
+                                )}
                                 {isLoading ? (
                                     <ProjectsSkeleton />
                                 ) : (
@@ -597,8 +1038,56 @@ export default function ProjectsIndex({ auth, projects, counts, activeTab, filte
                                             </Select>
                                         )}
 
+                                        <Select value={currentPerPage} onValueChange={handlePerPageChange}>
+                                            <SelectTrigger className="w-[130px] bg-background">
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="12">{t('12 per page')}</SelectItem>
+                                                <SelectItem value="24">{t('24 per page')}</SelectItem>
+                                                <SelectItem value="48">{t('48 per page')}</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+
                                         {/* Spacer */}
                                         <div className="flex-1" />
+
+                                        {activeTab !== 'trash' && (
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                className="gap-2"
+                                                onClick={handleGenerateMissingThumbnails}
+                                                disabled={visibleMissingThumbnailCount === 0}
+                                            >
+                                                <ImagePlus className="h-4 w-4" />
+                                                {t('Generate thumbnails')}
+                                            </Button>
+                                        )}
+
+                                        {/* Create Project Button */}
+                                        {activeTab !== 'trash' && (
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <Button size="sm" className="gap-2">
+                                                        <Plus className="h-4 w-4" />
+                                                        {t('Create Project')}
+                                                    </Button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent align="end">
+                                                    <DropdownMenuItem onClick={() => router.visit('/create')}>
+                                                        <Zap className="h-4 w-4 me-2" />
+                                                        {t('AI-Powered Project')}
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuSeparator />
+                                                    <DropdownMenuItem onClick={handleCreateBlankProject}>
+                                                        <Code2 className="h-4 w-4 me-2" />
+                                                        {t('Manual Hosting Project')}
+                                                    </DropdownMenuItem>
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
+                                        )}
 
                                         {/* View Toggle */}
                                         <div className="flex items-center border rounded-lg bg-background">
@@ -650,19 +1139,46 @@ export default function ProjectsIndex({ auth, projects, counts, activeTab, filte
                                                 }}
                                                 isTrash={activeTab === 'trash'}
                                                 thumbnailUrl={getThumbnailUrl(project)}
+                                                isGeneratingThumbnail={generatingThumbnailIds.has(project.id)}
+                                                canGenerateThumbnail={Boolean(project.preview_url)}
                                                 onToggleStar={handleToggleStar}
+                                                onRename={handleRename}
                                                 onDuplicate={handleDuplicate}
                                                 onDelete={handleDelete}
                                                 onRestore={handleRestore}
                                                 onPermanentDelete={handlePermanentDelete}
+                                                onGenerateThumbnail={handleGenerateThumbnail}
                                             />
                                         ))}
 
                                         {/* Empty state */}
-                                        {projects.data.length === 0 && (
+                                        {projects.data.length === 0 && activeTab !== 'trash' && (
+                                            <div className="col-span-full">
+                                                <div className="bg-card border border-border rounded-lg p-12 text-center">
+                                                    <Folder className="h-16 w-16 text-muted-foreground/30 mx-auto mb-4" />
+                                                    <h3 className="text-xl font-semibold mb-2">{t('No Projects Yet')}</h3>
+                                                    <p className="text-muted-foreground mb-8">
+                                                        {t('Create your first project to get started')}
+                                                    </p>
+                                                    <div className="flex gap-3 justify-center flex-wrap">
+                                                        <Button size="lg" onClick={() => router.visit('/create')} className="gap-2">
+                                                            <Zap className="h-5 w-5" />
+                                                            {t('Create AI Project')}
+                                                        </Button>
+                                                        <Button size="lg" variant="outline" onClick={handleCreateBlankProject} className="gap-2">
+                                                            <Code2 className="h-5 w-5" />
+                                                            {t('Create Manual Hosting Project')}
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Empty state for trash */}
+                                        {projects.data.length === 0 && activeTab === 'trash' && (
                                             <div className="col-span-full text-center py-12">
                                                 <p className="text-muted-foreground">
-                                                    {getEmptyMessage()}
+                                                    {t('Trash is empty.')}
                                                 </p>
                                             </div>
                                         )}
@@ -670,28 +1186,52 @@ export default function ProjectsIndex({ auth, projects, counts, activeTab, filte
 
                                     {/* Pagination */}
                                     {projects.last_page > 1 && (
-                                        <div className="flex items-center justify-center gap-2 mt-8">
-                                            <Button
-                                                variant="outline"
-                                                size="sm"
-                                                onClick={() => handlePageChange(projects.current_page - 1)}
-                                                disabled={projects.current_page === 1}
-                                            >
-                                                <ChevronLeft className="h-4 w-4 me-1" />
-                                                {t('Previous')}
-                                            </Button>
-                                            <span className="text-sm text-muted-foreground px-4">
-                                                {t('Page :current of :total', { current: projects.current_page, total: projects.last_page })}
-                                            </span>
-                                            <Button
-                                                variant="outline"
-                                                size="sm"
-                                                onClick={() => handlePageChange(projects.current_page + 1)}
-                                                disabled={projects.current_page === projects.last_page}
-                                            >
-                                                {t('Next')}
-                                                <ChevronRight className="h-4 w-4 ms-1" />
-                                            </Button>
+                                        <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                            <p className="text-sm text-muted-foreground">
+                                                {projects.from && projects.to
+                                                    ? t('Showing :from-:to of :total projects', {
+                                                        from: projects.from,
+                                                        to: projects.to,
+                                                        total: projects.total,
+                                                    })
+                                                    : t(':total projects', { total: projects.total })}
+                                            </p>
+                                            <div className="flex flex-wrap items-center justify-center gap-2">
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={() => handlePageChange(projects.current_page - 1)}
+                                                    disabled={projects.current_page === 1}
+                                                >
+                                                    <ChevronLeft className="h-4 w-4 me-1" />
+                                                    {t('Previous')}
+                                                </Button>
+                                                {paginationItems.map((item, index) => item === 'ellipsis' ? (
+                                                    <span key={`ellipsis-${index}`} className="px-2 text-sm text-muted-foreground">
+                                                        ...
+                                                    </span>
+                                                ) : (
+                                                    <Button
+                                                        key={item}
+                                                        variant={item === projects.current_page ? 'default' : 'outline'}
+                                                        size="sm"
+                                                        className="h-9 min-w-9 px-3"
+                                                        onClick={() => handlePageChange(item)}
+                                                        disabled={item === projects.current_page}
+                                                    >
+                                                        {item}
+                                                    </Button>
+                                                ))}
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={() => handlePageChange(projects.current_page + 1)}
+                                                    disabled={projects.current_page === projects.last_page}
+                                                >
+                                                    {t('Next')}
+                                                    <ChevronRight className="h-4 w-4 ms-1" />
+                                                </Button>
+                                            </div>
                                         </div>
                                     )}
                                 </div>
@@ -701,6 +1241,41 @@ export default function ProjectsIndex({ auth, projects, counts, activeTab, filte
                     </SidebarInset>
                 </SidebarProvider>
             </TooltipProvider>
+
+            <Dialog open={renameDialogOpen} onOpenChange={setRenameDialogOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>{t('Rename project')}</DialogTitle>
+                        <DialogDescription>
+                            {t('This name is shown in your projects list and admin views.')}
+                        </DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={submitRename} className="space-y-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="project-name">{t('Project name')}</Label>
+                            <Input
+                                id="project-name"
+                                value={renameValue}
+                                onChange={(e) => setRenameValue(e.target.value)}
+                                autoFocus
+                                maxLength={255}
+                            />
+                        </div>
+                        <DialogFooter>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setRenameDialogOpen(false)}
+                            >
+                                {t('Cancel')}
+                            </Button>
+                            <Button type="submit" disabled={isRenaming || renameValue.trim() === ''}>
+                                {isRenaming ? t('Saving...') : t('Save')}
+                            </Button>
+                        </DialogFooter>
+                    </form>
+                </DialogContent>
+            </Dialog>
 
             {/* Permanent delete confirmation dialog */}
             <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>

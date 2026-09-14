@@ -81,6 +81,20 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Alias Base Domains
+    |--------------------------------------------------------------------------
+    |
+    | Additional base domains that serve exactly the same published projects
+    | as the primary base domain. Used to keep sites reachable after a domain
+    | migration. Comma separated, e.g. "old-domain.com,legacy.example".
+    | The database setting "domain_alias_domains" takes precedence.
+    |
+    */
+
+    'alias_domains' => env('APP_ALIAS_DOMAINS', ''),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Timezone
     |--------------------------------------------------------------------------
     |
@@ -103,11 +117,11 @@ return [
     |
     */
 
-    'locale' => env('APP_LOCALE', 'en'),
+    'locale' => env('APP_LOCALE', 'es'),
 
-    'fallback_locale' => env('APP_FALLBACK_LOCALE', 'en'),
+    'fallback_locale' => env('APP_FALLBACK_LOCALE', 'es'),
 
-    'faker_locale' => env('APP_FAKER_LOCALE', 'en_US'),
+    'faker_locale' => env('APP_FAKER_LOCALE', 'es_ES'),
 
     /*
     |--------------------------------------------------------------------------

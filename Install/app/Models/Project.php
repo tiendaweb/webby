@@ -10,6 +10,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class Project extends Model
 {
@@ -17,6 +19,7 @@ class Project extends Model
 
     protected $fillable = [
         'user_id',
+        'type',
         'template_id',
         'name',
         'description',
@@ -95,6 +98,16 @@ class Project extends Model
         return $this->belongsTo(Builder::class);
     }
 
+    public function revisions(): HasMany
+    {
+        return $this->hasMany(ProjectRevision::class);
+    }
+
+    public function pageSettings(): HasMany
+    {
+        return $this->hasMany(ProjectPageSetting::class);
+    }
+
     public function sharedWith(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'project_shares')
@@ -109,9 +122,56 @@ class Project extends Model
         $newProject->name = $this->name.' (Copy)';
         $newProject->is_starred = false;
         $newProject->last_viewed_at = now();
+        $newProject->api_token = \Illuminate\Support\Str::random(32);
         $newProject->save();
 
+        // For blank projects, copy files and preview
+        if ($this->type === 'blank') {
+            $this->duplicateBlankProjectFiles($newProject);
+        }
+
         return $newProject;
+    }
+
+    /**
+     * Duplicate files from one blank project to another
+     */
+    private function duplicateBlankProjectFiles(self $newProject): void
+    {
+        $disk = \Illuminate\Support\Facades\Storage::disk('local');
+
+        // Copy project files
+        $sourceDir = "project-files/{$this->id}";
+        $destDir = "project-files/{$newProject->id}";
+
+        if ($disk->exists($sourceDir)) {
+            $disk->makeDirectory($destDir);
+            foreach ($disk->allFiles($sourceDir) as $file) {
+                $content = $disk->get($file);
+                $relative = ltrim(str_replace($sourceDir, '', $file), '/');
+                $disk->put("{$destDir}/{$relative}", $content);
+            }
+        }
+
+        // Copy ProjectFile DB records
+        foreach ($this->files as $file) {
+            $newFile = $file->replicate(['id', 'created_at', 'updated_at']);
+            $newFile->project_id = $newProject->id;
+            $newFile->path = str_replace("project-files/{$this->id}", "project-files/{$newProject->id}", $file->path);
+            $newFile->save();
+        }
+
+        // Copy preview directory if it exists
+        $sourcePreview = "previews/{$this->id}";
+        $destPreview = "previews/{$newProject->id}";
+        if ($disk->exists($sourcePreview)) {
+            $disk->makeDirectory($destPreview);
+            foreach ($disk->allFiles($sourcePreview) as $file) {
+                $content = $disk->get($file);
+                $relative = ltrim(str_replace($sourcePreview, '', $file), '/');
+                $disk->put("{$destPreview}/{$relative}", $content);
+            }
+        }
     }
 
     /**
@@ -164,6 +224,229 @@ class Project extends Model
         }
 
         $this->update($updateData);
+    }
+
+    // ---------------------------------------------------------------
+    // Connector notes
+    // ---------------------------------------------------------------
+    //
+    // A note is a chat message that is deliberately NOT sent to the AI
+    // builder. It sits in the same conversation_history as everything else
+    // — so it reads as part of the thread — but carries role "note", which
+    // getHistoryForBuilder() already filters out along with every other
+    // non-user/assistant role. Nothing about the existing send-to-the-AI
+    // path changes.
+    //
+    // What a note is for: leaving an instruction that an MCP connector
+    // (Claude/ChatGPT/Grok) picks up later, acts on, and answers. The
+    // connector's answer comes back as a "note_result" entry, which renders
+    // in the assistant position — so the reply you read in the chat is the
+    // account of what the connector actually did.
+
+    public const NOTE_STATUSES = ['pending', 'in_progress', 'done', 'failed', 'cancelled'];
+
+    /**
+     * Add a note to the conversation. Returns the stored entry, including
+     * the generated note_id a connector will address it by.
+     *
+     * @param  array<int, array{id: int, filename: string, mime_type: string}>|null  $files
+     */
+    public function appendNote(string $content, ?User $author = null, ?array $files = null): array
+    {
+        $entry = [
+            'role' => 'note',
+            'note_id' => 'note_'.Str::random(20),
+            'content' => $content,
+            'status' => 'pending',
+            'timestamp' => now()->toISOString(),
+        ];
+
+        if ($author) {
+            $entry['author'] = ['id' => $author->id, 'name' => $author->name];
+        }
+
+        if ($files !== null && count($files) > 0) {
+            $entry['files'] = $files;
+        }
+
+        // Notes never reach the model, so estimated_tokens is left alone and
+        // compacted_history stays valid — unlike appendToHistory().
+        $this->pushHistoryEntry($entry);
+
+        return $entry;
+    }
+
+    /**
+     * Record what a connector did with a note: appends the result entry and
+     * moves the note itself to its new status, in one write.
+     *
+     * @param  string  $status  one of NOTE_STATUSES; the note ends up here too
+     * @param  array|null  $data  optional structured payload (ids touched, urls, …)
+     * @return array{note: array, result: array}|null null when the note id is unknown
+     */
+    public function appendNoteResult(
+        string $noteId,
+        string $content,
+        string $status = 'done',
+        ?string $source = null,
+        ?array $data = null,
+    ): ?array {
+        if (! in_array($status, self::NOTE_STATUSES, true)) {
+            $status = 'done';
+        }
+
+        $result = [
+            'role' => 'note_result',
+            'note_id' => $noteId,
+            'content' => $content,
+            'status' => $status,
+            'source' => $source,
+            'timestamp' => now()->toISOString(),
+        ];
+
+        if ($data !== null && $data !== []) {
+            $result['data'] = $data;
+        }
+
+        return DB::transaction(function () use ($noteId, $status, $result) {
+            /** @var self $fresh */
+            $fresh = self::where('id', $this->id)->lockForUpdate()->first();
+
+            if (! $fresh) {
+                return null;
+            }
+
+            $history = $fresh->conversation_history ?? [];
+            $noteIndex = null;
+
+            foreach ($history as $index => $entry) {
+                if (($entry['role'] ?? '') === 'note' && ($entry['note_id'] ?? '') === $noteId) {
+                    $noteIndex = $index;
+                    break;
+                }
+            }
+
+            if ($noteIndex === null) {
+                return null;
+            }
+
+            $history[$noteIndex]['status'] = $status;
+            $history[$noteIndex]['answered_at'] = now()->toISOString();
+            $history[] = $result;
+
+            $fresh->update(['conversation_history' => $history]);
+            $this->setRawAttributes($fresh->getAttributes(), true);
+
+            return ['note' => $history[$noteIndex], 'result' => $result];
+        });
+    }
+
+    /**
+     * Move a note to another status without answering it — how a connector
+     * claims one ("in_progress") before it starts working.
+     */
+    public function updateNoteStatus(string $noteId, string $status): ?array
+    {
+        if (! in_array($status, self::NOTE_STATUSES, true)) {
+            return null;
+        }
+
+        return DB::transaction(function () use ($noteId, $status) {
+            /** @var self $fresh */
+            $fresh = self::where('id', $this->id)->lockForUpdate()->first();
+
+            if (! $fresh) {
+                return null;
+            }
+
+            $history = $fresh->conversation_history ?? [];
+
+            foreach ($history as $index => $entry) {
+                if (($entry['role'] ?? '') === 'note' && ($entry['note_id'] ?? '') === $noteId) {
+                    $history[$index]['status'] = $status;
+                    $fresh->update(['conversation_history' => $history]);
+                    $this->setRawAttributes($fresh->getAttributes(), true);
+
+                    return $history[$index];
+                }
+            }
+
+            return null;
+        });
+    }
+
+    /**
+     * Notes with the results already attached, newest last.
+     *
+     * @param  string|null  $status  filter, e.g. "pending" to get the queue
+     * @return array<int, array>
+     */
+    public function listNotes(?string $status = null, int $limit = 50): array
+    {
+        $history = $this->conversation_history ?? [];
+        $notes = [];
+        $resultsByNote = [];
+
+        foreach ($history as $entry) {
+            if (($entry['role'] ?? '') === 'note_result' && ! empty($entry['note_id'])) {
+                $resultsByNote[$entry['note_id']][] = [
+                    'content' => $entry['content'] ?? '',
+                    'status' => $entry['status'] ?? null,
+                    'source' => $entry['source'] ?? null,
+                    'timestamp' => $entry['timestamp'] ?? null,
+                    'data' => $entry['data'] ?? null,
+                ];
+            }
+        }
+
+        foreach ($history as $entry) {
+            if (($entry['role'] ?? '') !== 'note') {
+                continue;
+            }
+
+            if ($status !== null && ($entry['status'] ?? 'pending') !== $status) {
+                continue;
+            }
+
+            $noteId = $entry['note_id'] ?? '';
+
+            $notes[] = [
+                'note_id' => $noteId,
+                'content' => $entry['content'] ?? '',
+                'status' => $entry['status'] ?? 'pending',
+                'created_at' => $entry['timestamp'] ?? null,
+                'answered_at' => $entry['answered_at'] ?? null,
+                'author' => $entry['author'] ?? null,
+                'files' => $entry['files'] ?? null,
+                'results' => $resultsByNote[$noteId] ?? [],
+            ];
+        }
+
+        return array_slice($notes, -$limit);
+    }
+
+    public function findNote(string $noteId): ?array
+    {
+        foreach ($this->listNotes() as $note) {
+            if ($note['note_id'] === $noteId) {
+                return $note;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Append a raw entry to conversation_history without the token
+     * accounting appendToHistory() does. Used by the note entries, which
+     * are never part of the model's context.
+     */
+    private function pushHistoryEntry(array $entry): void
+    {
+        $history = $this->conversation_history ?? [];
+        $history[] = $entry;
+
+        $this->update(['conversation_history' => $history]);
     }
 
     /**
@@ -329,9 +612,16 @@ class Project extends Model
             return null;
         }
 
-        $scheme = app()->environment('local') ? 'http' : 'https';
+        $appUrl = config('app.url');
+        $scheme = parse_url($appUrl, PHP_URL_SCHEME) ?: (app()->environment('local') ? 'http' : 'https');
+        $appHost = parse_url($appUrl, PHP_URL_HOST) ?: '';
+        $appPort = parse_url($appUrl, PHP_URL_PORT);
+        $isLocal = in_array($appHost, ['localhost', '127.0.0.1', '::1'], true)
+            || str_ends_with($appHost, '.lvh.me')
+            || str_ends_with($appHost, '.localhost');
+        $port = $isLocal && $appPort && ! in_array((int) $appPort, [80, 443], true) ? ':'.$appPort : '';
 
-        return "{$scheme}://{$this->subdomain}.{$baseDomain}";
+        return "{$scheme}://{$this->subdomain}.{$baseDomain}{$port}";
     }
 
     // ============================================

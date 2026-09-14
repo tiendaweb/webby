@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Http\Traits\ChecksDemoMode;
+use App\Models\LandingPage;
 use App\Models\LandingSection;
 use App\Models\Language;
 use App\Models\Plan;
@@ -28,33 +29,187 @@ class LandingBuilderController extends Controller
         protected LandingPageService $landingPageService
     ) {}
 
-    /**
-     * Display the landing page builder.
-     */
-    public function index(): Response
+    // ─────────────────────────────────────────────────────────────
+    // Main builder view
+    // ─────────────────────────────────────────────────────────────
+
+    public function index(Request $request): Response
     {
-        $sections = $this->landingPageService->getAllSectionsForAdmin();
+        $pages = $this->landingPageService->getAllPagesForAdmin();
+
+        // Determine active page for editing
+        $pageId = $request->query('page');
+        if ($pageId) {
+            $currentPage = LandingPage::find($pageId);
+        }
+        if (empty($currentPage)) {
+            $currentPage = LandingPage::where('is_home', true)->first()
+                ?? LandingPage::first();
+        }
+
+        $sections     = ($currentPage && $currentPage->type !== 'html_code')
+            ? $this->landingPageService->getAllSectionsForAdmin($currentPage->id)
+            : [];
         $sectionTypes = $this->landingPageService->getSectionTypes();
-        $languages = Language::active()->orderBy('sort_order')->get();
+        $presets      = $this->landingPageService->getPagePresets();
+        $languages    = Language::active()->orderBy('sort_order')->get();
         $defaultLanguage = Language::getDefault()?->code ?? 'en';
 
+        $htmlCode = ($currentPage && $currentPage->type === 'html_code')
+            ? $this->landingPageService->getPageHtmlCode($currentPage->id)
+            : null;
+
         return Inertia::render('Admin/LandingBuilder/Index', [
-            'sections' => $sections,
-            'sectionTypes' => $sectionTypes,
-            'languages' => $languages,
+            'pages'           => $pages,
+            'currentPage'     => $currentPage ? $currentPage->toArray() : null,
+            'sections'        => $sections,
+            'sectionTypes'    => $sectionTypes,
+            'presets'         => $presets,
+            'languages'       => $languages,
             'defaultLanguage' => $defaultLanguage,
+            'htmlCode'        => $htmlCode,
         ]);
     }
 
-    /**
-     * Display the landing page preview.
-     */
+    // ─────────────────────────────────────────────────────────────
+    // Page CRUD
+    // ─────────────────────────────────────────────────────────────
+
+    public function storePage(Request $request): RedirectResponse|JsonResponse
+    {
+        if ($redirect = $this->denyIfDemo()) {
+            return $request->wantsJson()
+                ? response()->json(['error' => __('This action is disabled in demo mode.')], 403)
+                : $redirect;
+        }
+
+        $validated = $request->validate([
+            'name'             => 'required|string|max:100',
+            'slug'             => [
+                'required', 'string', 'max:100',
+                'alpha_dash',
+                'unique:landing_pages,slug',
+                function ($attr, $value, $fail) {
+                    if (LandingPage::isReservedSlug($value)) {
+                        $fail(__('This slug is reserved and cannot be used.'));
+                    }
+                },
+            ],
+            'type'             => 'sometimes|in:sections,html_code',
+            'preset'           => 'nullable|string|in:default,saas,ecommerce,dashboard,portfolio,restaurant,cms',
+            'is_active'        => 'boolean',
+            'meta_title'       => 'nullable|string|max:160',
+            'meta_description' => 'nullable|string|max:300',
+        ]);
+
+        $page = $this->landingPageService->createPage($validated);
+
+        if ($request->wantsJson()) {
+            return response()->json(['success' => true, 'page' => $page]);
+        }
+
+        return redirect()->route('admin.landing-builder.index', ['page' => $page->id])
+            ->with('success', __('Landing page created successfully.'));
+    }
+
+    public function updatePage(Request $request, LandingPage $landingPage): RedirectResponse|JsonResponse
+    {
+        if ($redirect = $this->denyIfDemo()) {
+            return $request->wantsJson()
+                ? response()->json(['error' => __('This action is disabled in demo mode.')], 403)
+                : $redirect;
+        }
+
+        $validated = $request->validate([
+            'name'             => 'sometimes|string|max:100',
+            'slug'             => [
+                'sometimes', 'string', 'max:100', 'alpha_dash',
+                Rule::unique('landing_pages', 'slug')->ignore($landingPage->id),
+                function ($attr, $value, $fail) {
+                    if (LandingPage::isReservedSlug($value)) {
+                        $fail(__('This slug is reserved and cannot be used.'));
+                    }
+                },
+            ],
+            'is_active'        => 'sometimes|boolean',
+            'is_home'          => 'sometimes|boolean',
+            'meta_title'       => 'nullable|string|max:160',
+            'meta_description' => 'nullable|string|max:300',
+        ]);
+
+        $page = $this->landingPageService->updatePage($landingPage->id, $validated);
+
+        if ($request->wantsJson()) {
+            return response()->json(['success' => true, 'page' => $page]);
+        }
+
+        return back()->with('success', __('Landing page updated successfully.'));
+    }
+
+    public function destroyPage(LandingPage $landingPage): RedirectResponse|JsonResponse
+    {
+        if ($redirect = $this->denyIfDemo()) {
+            return $redirect;
+        }
+
+        try {
+            $this->landingPageService->deletePage($landingPage->id);
+        } catch (\RuntimeException $e) {
+            return back()->withErrors(['page' => $e->getMessage()]);
+        }
+
+        return redirect()->route('admin.landing-builder.index')
+            ->with('success', __('Landing page deleted.'));
+    }
+
+    public function updatePageCode(Request $request, LandingPage $landingPage): JsonResponse
+    {
+        if ($this->denyIfDemo()) {
+            return response()->json(['error' => __('This action is disabled in demo mode.')], 403);
+        }
+
+        $validated = $request->validate([
+            'html_code' => 'present|nullable|string|max:10485760',
+        ]);
+
+        $this->landingPageService->updatePageHtmlCode($landingPage->id, $validated['html_code'] ?? '');
+
+        return response()->json(['success' => true, 'message' => __('HTML code saved successfully.')]);
+    }
+
+    public function setHomePage(LandingPage $landingPage): RedirectResponse
+    {
+        if ($redirect = $this->denyIfDemo()) {
+            return $redirect;
+        }
+
+        $this->landingPageService->setAsHome($landingPage->id);
+
+        return back()->with('success', __('Home page updated.'));
+    }
+
+    public function togglePageActive(LandingPage $landingPage): JsonResponse
+    {
+        if ($this->denyIfDemo()) {
+            return response()->json(['error' => __('This action is disabled in demo mode.')], 403);
+        }
+
+        $page = $this->landingPageService->toggleActive($landingPage->id);
+
+        return response()->json(['success' => true, 'is_active' => $page->is_active]);
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // Preview
+    // ─────────────────────────────────────────────────────────────
+
     public function preview(Request $request): Response
     {
         $locale = $request->input('locale', app()->getLocale());
-        $config = $this->landingPageService->getPreviewConfig($locale);
+        $pageId = $request->query('page');
 
-        // Enrich hero section with fallback content (same as public route)
+        $config = $this->landingPageService->getPreviewConfig($locale, $pageId ? (int) $pageId : null);
+
         $internalAiService = app(InternalAiService::class);
         if (isset($config['sections'])) {
             foreach ($config['sections'] as &$section) {
@@ -85,28 +240,25 @@ class LandingBuilderController extends Controller
             unset($section);
         }
 
-        // Get additional props needed for landing page
         return Inertia::render('Landing', array_merge($config, [
-            'isPreview' => true,
-            'canLogin' => Route::has('login'),
-            'canRegister' => Route::has('register') && SystemSetting::get('enable_registration', true),
-            'plans' => Plan::active()->orderBy('sort_order')->get([
+            'isPreview'          => true,
+            'canLogin'           => Route::has('login'),
+            'canRegister'        => Route::has('register') && SystemSetting::get('enable_registration', true),
+            'plans'              => Plan::active()->orderBy('sort_order')->get([
                 'id', 'name', 'slug', 'description', 'price', 'billing_period',
                 'monthly_build_credits', 'max_projects', 'enable_firebase',
                 'enable_file_storage', 'max_storage_mb', 'features', 'is_popular',
                 'allow_user_ai_api_key',
             ]),
             'isPusherConfigured' => app(BroadcastService::class)->isConfigured(),
-            'statistics' => [
-                'users' => 0,
-                'projects' => 0,
-            ],
+            'statistics'         => ['users' => 0, 'projects' => 0],
         ]));
     }
 
-    /**
-     * Reorder sections.
-     */
+    // ─────────────────────────────────────────────────────────────
+    // Section operations
+    // ─────────────────────────────────────────────────────────────
+
     public function reorder(Request $request): RedirectResponse
     {
         if ($redirect = $this->denyIfDemo()) {
@@ -114,7 +266,7 @@ class LandingBuilderController extends Controller
         }
 
         $validated = $request->validate([
-            'ids' => 'required|array',
+            'ids'   => 'required|array',
             'ids.*' => 'exists:landing_sections,id',
         ]);
 
@@ -123,9 +275,6 @@ class LandingBuilderController extends Controller
         return back()->with('success', __('Sections reordered successfully.'));
     }
 
-    /**
-     * Update a section's settings and enabled status.
-     */
     public function updateSection(Request $request, LandingSection $section): RedirectResponse
     {
         if ($redirect = $this->denyIfDemo()) {
@@ -134,7 +283,7 @@ class LandingBuilderController extends Controller
 
         $validated = $request->validate([
             'is_enabled' => 'boolean',
-            'settings' => 'nullable|array',
+            'settings'   => 'nullable|array',
         ]);
 
         $this->landingPageService->updateSection($section->id, $validated);
@@ -142,17 +291,12 @@ class LandingBuilderController extends Controller
         return back()->with('success', __('Section updated successfully.'));
     }
 
-    /**
-     * Update section content for a locale.
-     */
     public function updateContent(Request $request, LandingSection $section): RedirectResponse|JsonResponse
     {
         if ($redirect = $this->denyIfDemo()) {
-            if ($request->wantsJson()) {
-                return response()->json(['error' => __('This action is disabled in demo mode.')], 403);
-            }
-
-            return $redirect;
+            return $request->wantsJson()
+                ? response()->json(['error' => __('This action is disabled in demo mode.')], 403)
+                : $redirect;
         }
 
         $validated = $request->validate([
@@ -169,34 +313,28 @@ class LandingBuilderController extends Controller
         return back()->with('success', __('Content updated successfully.'));
     }
 
-    /**
-     * Update section items for a locale.
-     */
     public function updateItems(Request $request, LandingSection $section): RedirectResponse|JsonResponse
     {
         if ($redirect = $this->denyIfDemo()) {
-            if ($request->wantsJson()) {
-                return response()->json(['error' => __('This action is disabled in demo mode.')], 403);
-            }
-
-            return $redirect;
+            return $request->wantsJson()
+                ? response()->json(['error' => __('This action is disabled in demo mode.')], 403)
+                : $redirect;
         }
 
         $request->validate([
-            'locale' => ['required', 'string', 'max:10', Rule::exists('languages', 'code')],
-            'items' => 'required|array',
-            'items.*.key' => 'required|uuid',
-            'items.*.sort_order' => 'required|integer|min:0',
-            'items.*.is_enabled' => 'boolean',
-            'items.*.data' => 'required|array',
-            'items.*.data.rating' => 'nullable|integer|min:1|max:5',
-            'items.*.data.answer' => 'nullable|string|max:10000',
-            'items.*.data.image_url' => 'nullable|string|max:500',
-            'items.*.data.avatar' => 'nullable|string|max:500',
+            'locale'                  => ['required', 'string', 'max:10', Rule::exists('languages', 'code')],
+            'items'                   => 'required|array',
+            'items.*.key'             => 'required|uuid',
+            'items.*.sort_order'      => 'required|integer|min:0',
+            'items.*.is_enabled'      => 'boolean',
+            'items.*.data'            => 'required|array',
+            'items.*.data.rating'     => 'nullable|integer|min:1|max:5',
+            'items.*.data.answer'     => 'nullable|string|max:10000',
+            'items.*.data.image_url'  => 'nullable|string|max:500',
+            'items.*.data.avatar'     => 'nullable|string|max:500',
             'items.*.data.company_url' => 'nullable|string|max:500',
         ]);
 
-        // Use request directly to preserve the full data array
         $this->landingPageService->updateItems($section->id, $request->input('locale'), $request->input('items'));
 
         if ($request->wantsJson()) {
@@ -206,44 +344,95 @@ class LandingBuilderController extends Controller
         return back()->with('success', __('Items updated successfully.'));
     }
 
-    /**
-     * Upload a media file.
-     */
+    public function addSection(Request $request, LandingPage $landingPage): JsonResponse
+    {
+        if ($this->denyIfDemo()) {
+            return response()->json(['error' => __('This action is disabled in demo mode.')], 403);
+        }
+
+        $section = $this->landingPageService->addHtmlBlock($landingPage->id);
+
+        return response()->json([
+            'success' => true,
+            'section' => [
+                'id'              => $section->id,
+                'landing_page_id' => $section->landing_page_id,
+                'type'            => $section->type,
+                'sort_order'      => $section->sort_order,
+                'is_enabled'      => $section->is_enabled,
+                'settings'        => $section->settings ?? [],
+                'content'         => [],
+                'items'           => [],
+            ],
+        ]);
+    }
+
+    public function destroySection(LandingSection $section): JsonResponse
+    {
+        if ($this->denyIfDemo()) {
+            return response()->json(['error' => __('This action is disabled in demo mode.')], 403);
+        }
+
+        $this->landingPageService->deleteSection($section->id);
+
+        return response()->json(['success' => true]);
+    }
+
+    public function generateHtml(Request $request): JsonResponse
+    {
+        if ($this->denyIfDemo()) {
+            return response()->json(['error' => __('This action is disabled in demo mode.')], 403);
+        }
+
+        $validated = $request->validate([
+            'prompt' => 'required|string|max:2000',
+            'locale' => 'sometimes|string|max:10',
+        ]);
+
+        $aiService = app(InternalAiService::class);
+
+        if (! $aiService->isConfigured()) {
+            return response()->json(['error' => __('Internal AI is not configured.')], 422);
+        }
+
+        $html = $aiService->generateHtmlBlock($validated['prompt'], $validated['locale'] ?? 'en');
+
+        if ($html === null) {
+            return response()->json(['error' => __('Failed to generate HTML. Please try again.')], 500);
+        }
+
+        return response()->json(['success' => true, 'html' => $html]);
+    }
+
     public function uploadMedia(Request $request): JsonResponse
     {
         if (config('app.demo')) {
             return response()->json(['error' => __('This action is disabled in demo mode.')], 403);
         }
 
-        $validated = $request->validate([
+        $request->validate([
             'file' => 'required|file|mimes:jpg,jpeg,png,svg,webp|max:2048',
             'type' => 'required|in:logo,avatar,image',
         ]);
 
-        $file = $request->file('file');
+        $file     = $request->file('file');
         $filename = time().'_'.$file->getClientOriginalName();
-        $path = $file->storeAs('landing', $filename, 'public');
+        $path     = $file->storeAs('landing', $filename, 'public');
 
         return response()->json([
             'path' => basename($path),
-            'url' => Storage::disk('public')->url($path),
+            'url'  => Storage::disk('public')->url($path),
         ]);
     }
 
-    /**
-     * Delete a media file.
-     */
     public function deleteMedia(Request $request): JsonResponse
     {
         if (config('app.demo')) {
             return response()->json(['error' => __('This action is disabled in demo mode.')], 403);
         }
 
-        $validated = $request->validate([
-            'path' => 'required|string',
-        ]);
-
-        $fullPath = 'landing/'.$validated['path'];
+        $validated = $request->validate(['path' => 'required|string']);
+        $fullPath  = 'landing/'.$validated['path'];
 
         if (Storage::disk('public')->exists($fullPath)) {
             Storage::disk('public')->delete($fullPath);

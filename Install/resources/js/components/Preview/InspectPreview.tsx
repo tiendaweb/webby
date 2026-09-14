@@ -3,19 +3,38 @@ import { createPortal } from 'react-dom';
 import { GradientBackground } from '@/components/Dashboard/GradientBackground';
 import { ElementContextMenu } from './ElementContextMenu';
 import { PendingEditsPanel } from './PendingEditsPanel';
+import { VisualEditModal } from './VisualEditModal';
+import { SectionCodeEditModal } from './SectionCodeEditModal';
 import { usePreviewInspector } from '@/hooks/usePreviewInspector';
 import { usePreviewThemeSync } from '@/hooks/usePreviewThemeSync';
 import { useTranslation } from '@/contexts/LanguageContext';
 import { Button } from '@/components/ui/button';
-import { MousePointerClick, Edit2, Loader2 } from 'lucide-react';
+import { MousePointerClick, Edit2, Loader2, Monitor, Smartphone, Tablet } from 'lucide-react';
 import { toast } from 'sonner';
-import type { InspectorElement, ElementMention, PendingEdit, InspectorMode } from '@/types/inspector';
+import type {
+    InspectorElement,
+    ElementMention,
+    PendingEdit,
+    InspectorMode,
+    VisualEditField,
+    VisualEditPayload,
+    VisualEditResponse,
+    SectionCodeSaveResponse,
+    SectionCodeEditScope,
+} from '@/types/inspector';
 import confetti from 'canvas-confetti';
 import { Bot, Cog, Wrench } from 'lucide-react';
 import { usePreviewThemeInjection } from '@/hooks/usePreviewThemeInjection';
 import { useThumbnailCapture } from '@/hooks/useThumbnailCapture';
 
 type PreviewMode = 'preview' | 'inspect' | 'design';
+type DeviceMode = 'desktop' | 'tablet' | 'mobile';
+
+const DEVICE_MODES: Array<{ id: DeviceMode; label: string; width: number | null; icon: typeof Monitor }> = [
+    { id: 'desktop', label: 'Desktop', width: null, icon: Monitor },
+    { id: 'tablet', label: 'Tablet', width: 768, icon: Tablet },
+    { id: 'mobile', label: 'Mobile', width: 390, icon: Smartphone },
+];
 
 interface InspectPreviewProps {
     previewUrl?: string | null;
@@ -31,6 +50,16 @@ interface InspectPreviewProps {
     onSaveAllEdits?: () => Promise<void>;
     onDiscardAllEdits?: () => void;
     onRemoveEdit?: (id: string) => void;
+    onVisualEditSaved?: (response: VisualEditResponse) => void;
+    onProjectFileUploaded?: (file: {
+        id: number;
+        filename: string;
+        mime_type: string;
+        size: number;
+        human_size: string;
+        is_image: boolean;
+        url: string;
+    }) => void;
     // Design mode props
     themeDesignerSlot?: React.ReactNode;
     onThemeSelect?: (presetId: string) => void;
@@ -60,6 +89,221 @@ function BuildingAnimation({ t }: { t: (key: string) => string }) {
     );
 }
 
+const VISUAL_TEXT_TAGS = ['div', 'section', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'span', 'label', 'li', 'a', 'button', 'td', 'th'];
+
+const VISUAL_ATTRIBUTE_FIELDS: Record<string, VisualEditField[]> = {
+    a: ['href', 'title'],
+    img: ['src', 'alt', 'title'],
+    input: ['placeholder', 'title'],
+    textarea: ['placeholder', 'title'],
+    button: ['title'],
+};
+
+const SECTION_CODE_SELECTOR = 'section, [data-section], [data-block], [data-component], article, main, header, footer';
+const CONTAINER_CODE_SELECTOR = 'div, section, article, main, header, footer, nav, aside';
+
+function canEditText(element: InspectorElement): boolean {
+    return VISUAL_TEXT_TAGS.includes(element.tagName);
+}
+
+function isPreviewHTMLElement(element: Element | null): element is HTMLElement {
+    if (!element || element.nodeType !== 1) return false;
+
+    const view = element.ownerDocument.defaultView;
+    if (view?.HTMLElement) {
+        return element instanceof view.HTMLElement;
+    }
+
+    return typeof (element as HTMLElement).tagName === 'string'
+        && typeof (element as HTMLElement).matches === 'function';
+}
+
+function isCodeEditableTarget(element: Element | null): element is HTMLElement {
+    if (!isPreviewHTMLElement(element)) return false;
+
+    return !['html', 'head', 'body'].includes(element.tagName.toLowerCase());
+}
+
+function findClosestCodeTarget(element: HTMLElement, selector: string): HTMLElement | null {
+    let current: Element | null = element;
+
+    while (current && current !== element.ownerDocument.body) {
+        if (isPreviewHTMLElement(current) && current.matches(selector)) {
+            return current;
+        }
+
+        current = current.parentElement;
+    }
+
+    return null;
+}
+
+function findCodeEditTarget(element: HTMLElement, scope: SectionCodeEditScope): HTMLElement | null {
+    if (scope === 'element') {
+        return isCodeEditableTarget(element) ? element : null;
+    }
+
+    if (scope === 'container') {
+        const container = findClosestCodeTarget(element, CONTAINER_CODE_SELECTOR);
+        return isCodeEditableTarget(container) ? container : null;
+    }
+
+    const section = findClosestCodeTarget(element, SECTION_CODE_SELECTOR)
+        || findClosestCodeTarget(element, CONTAINER_CODE_SELECTOR);
+
+    return isCodeEditableTarget(section) ? section : null;
+}
+
+function cssEscape(value: string, doc: Document): string {
+    const css = doc.defaultView?.CSS ?? window.CSS;
+
+    if (css && typeof css.escape === 'function') {
+        return css.escape(value);
+    }
+
+    return value.replace(/[^a-zA-Z0-9_-]/g, char => `\\${char}`);
+}
+
+function getPreviewXPath(element: HTMLElement): string {
+    if (element.id) {
+        return `//*[@id="${element.id}"]`;
+    }
+
+    const parts: string[] = [];
+    let current: Element | null = element;
+
+    while (current && current.nodeType === Node.ELEMENT_NODE) {
+        let index = 1;
+        let sibling = current.previousElementSibling;
+
+        while (sibling) {
+            if (sibling.nodeName === current.nodeName) {
+                index += 1;
+            }
+            sibling = sibling.previousElementSibling;
+        }
+
+        const tagName = current.nodeName.toLowerCase();
+        parts.unshift(index > 1 ? `${tagName}[${index}]` : tagName);
+        current = current.parentElement;
+    }
+
+    return `/${parts.join('/')}`;
+}
+
+function getPreviewCssSelector(element: HTMLElement): string {
+    const doc = element.ownerDocument;
+
+    if (element.id) {
+        return `#${cssEscape(element.id, doc)}`;
+    }
+
+    const parts: string[] = [];
+    let current: Element | null = element;
+
+    while (current && current.nodeType === Node.ELEMENT_NODE && current !== doc.body) {
+        let selector = current.tagName.toLowerCase();
+        const classes = Array.from((current as HTMLElement).classList)
+            .filter(className => !className.startsWith('preview-inspector-') && className.length < 30);
+
+        if (classes.length > 0) {
+            selector += `.${cssEscape(classes[0], doc)}`;
+        }
+
+        let siblings: Element[] = [];
+        try {
+            siblings = current.parentElement
+                ? Array.from(current.parentElement.querySelectorAll(`:scope > ${selector}`))
+                : [];
+        } catch {
+            siblings = [];
+        }
+
+        if (siblings.length > 1) {
+            selector += `:nth-of-type(${siblings.indexOf(current) + 1})`;
+        }
+
+        parts.unshift(selector);
+
+        const fullSelector = parts.join(' > ');
+        try {
+            if (doc.querySelectorAll(fullSelector).length === 1) {
+                return fullSelector;
+            }
+        } catch {
+            // Keep walking up when an intermediate selector cannot be queried safely.
+        }
+
+        current = current.parentElement;
+    }
+
+    return parts.join(' > ');
+}
+
+function getPreviewTextPreview(element: HTMLElement): string {
+    const text = (element.textContent || '').trim();
+    return text.length > 50 ? `${text.substring(0, 50)}...` : text;
+}
+
+function getPreviewEditableAttributes(element: HTMLElement): Record<string, string> {
+    const attrs: Record<string, string> = {};
+    const editableAttrs = VISUAL_ATTRIBUTE_FIELDS[element.tagName.toLowerCase()] ?? [];
+
+    for (const attr of editableAttrs) {
+        const value = element.getAttribute(attr);
+        if (value !== null) {
+            attrs[attr] = value;
+        }
+    }
+
+    return attrs;
+}
+
+function getPreviewContainedImages(element: HTMLElement): InspectorElement['images'] {
+    const images = element.tagName.toLowerCase() === 'img'
+        ? [element as HTMLImageElement]
+        : Array.from(element.querySelectorAll('img'));
+
+    return images
+        .map((image, index) => {
+            const selector = getPreviewCssSelector(image);
+
+            return {
+                id: `${selector}-${index}`,
+                cssSelector: selector,
+                src: image.getAttribute('src') || '',
+                currentSrc: image.currentSrc || image.src || '',
+                alt: image.getAttribute('alt') || '',
+                title: image.getAttribute('title') || '',
+            };
+        })
+        .filter(image => image.src !== '' || image.currentSrc !== '')
+        .slice(0, 20);
+}
+
+function serializePreviewElement(element: HTMLElement): InspectorElement {
+    const rect = element.getBoundingClientRect();
+
+    return {
+        id: `el-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
+        tagName: element.tagName.toLowerCase(),
+        elementId: element.id || null,
+        classNames: Array.from(element.classList),
+        textPreview: getPreviewTextPreview(element),
+        xpath: getPreviewXPath(element),
+        cssSelector: getPreviewCssSelector(element),
+        boundingRect: {
+            top: rect.top,
+            left: rect.left,
+            width: rect.width,
+            height: rect.height,
+        },
+        attributes: getPreviewEditableAttributes(element),
+        parentTagName: element.parentElement ? element.parentElement.tagName.toLowerCase() : null,
+        images: getPreviewContainedImages(element),
+    };
+}
+
 /**
  * Preview component with element inspection capabilities.
  * Allows users to click elements and mention them in chat or edit inline.
@@ -77,6 +321,8 @@ export function InspectPreview({
     onSaveAllEdits,
     onDiscardAllEdits,
     onRemoveEdit,
+    onVisualEditSaved,
+    onProjectFileUploaded,
     themeDesignerSlot,
     onThemeSelect,
     isSavingTheme = false,
@@ -90,6 +336,22 @@ export function InspectPreview({
     const previousMode = useRef<PreviewMode>(mode);
     const [isSaving, setIsSaving] = useState(false);
     const [iframeReady, setIframeReady] = useState(false);
+    const [sectionCodeElement, setSectionCodeElement] = useState<InspectorElement | null>(null);
+    const [sectionCodeOuterHtml, setSectionCodeOuterHtml] = useState('');
+    const [visualEditElement, setVisualEditElement] = useState<InspectorElement | null>(null);
+    const [visualEditValues, setVisualEditValues] = useState<Partial<Record<VisualEditField, string>>>({});
+    const [deviceMode, setDeviceMode] = useState<DeviceMode>(() => {
+        if (typeof window === 'undefined') return 'desktop';
+        const saved = window.localStorage.getItem('webby-preview-device');
+        return saved === 'tablet' || saved === 'mobile' ? saved : 'desktop';
+    });
+
+    const activeDevice = DEVICE_MODES.find(device => device.id === deviceMode) ?? DEVICE_MODES[0];
+
+    const changeDeviceMode = useCallback((nextMode: DeviceMode) => {
+        setDeviceMode(nextMode);
+        window.localStorage.setItem('webby-preview-device', nextMode);
+    }, []);
 
     // Use the preview inspector hook - only enabled in inspect mode
     const {
@@ -98,7 +360,6 @@ export function InspectPreview({
         contextMenu,
         closeContextMenu,
         isReady,
-        startEditingElement,
         revertEdits,
     } = usePreviewInspector({
         iframeRef,
@@ -231,13 +492,88 @@ export function InspectPreview({
         toast.success(t('Element added to chat input'));
     }, [onElementSelect, closeContextMenu, t]);
 
+    const getIframeElement = useCallback((selector: string): HTMLElement | null => {
+        const doc = iframeRef.current?.contentDocument;
+        if (!doc) return null;
+
+        try {
+            const target = doc.querySelector(selector);
+            return isPreviewHTMLElement(target) ? target : null;
+        } catch {
+            return null;
+        }
+    }, []);
+
+    const readVisualEditValues = useCallback((element: InspectorElement) => {
+        const target = getIframeElement(element.cssSelector);
+        const values: Partial<Record<VisualEditField, string>> = {};
+
+        if (canEditText(element)) {
+            values.text = target?.textContent ?? element.textPreview ?? '';
+        }
+
+        for (const field of VISUAL_ATTRIBUTE_FIELDS[element.tagName] ?? []) {
+            values[field] = target?.getAttribute(field) ?? element.attributes[field] ?? '';
+        }
+
+        return values;
+    }, [getIframeElement]);
+
+    const setPreviewValue = useCallback((payload: VisualEditPayload, value: string) => {
+        const target = getIframeElement(payload.selector);
+        if (!target) return;
+
+        if (payload.field === 'text') {
+            target.textContent = value;
+            return;
+        }
+
+        target.setAttribute(payload.field, value);
+    }, [getIframeElement]);
+
+    const applyVisualPreviewEdit = useCallback((payload: VisualEditPayload) => {
+        setPreviewValue(payload, payload.newValue);
+    }, [setPreviewValue]);
+
+    const revertVisualPreviewEdit = useCallback((payload: VisualEditPayload) => {
+        setPreviewValue(payload, payload.originalValue);
+    }, [setPreviewValue]);
+
+    const getCurrentPreviewPath = useCallback(() => {
+        if (!projectId) return undefined;
+
+        try {
+            const href = iframeRef.current?.contentWindow?.location.href || iframeRef.current?.src;
+            if (!href) return undefined;
+
+            const url = new URL(href, window.location.origin);
+            const marker = `/preview/${projectId}/`;
+
+            if (!url.pathname.startsWith(marker)) {
+                return undefined;
+            }
+
+            const path = decodeURIComponent(url.pathname.slice(marker.length));
+            return path || 'index.html';
+        } catch {
+            return undefined;
+        }
+    }, [projectId]);
+
+    const handleVisualEditSaved = useCallback((response: VisualEditResponse) => {
+        if (response.warning) {
+            toast.warning(response.warning);
+        }
+
+        onVisualEditSaved?.(response);
+    }, [onVisualEditSaved]);
+
     // Handle edit from context menu
     const handleEdit = useCallback((element: InspectorElement) => {
         closeContextMenu();
-        // Switch to edit mode and start editing the element
-        setInspectorMode('edit');
-        startEditingElement(element.cssSelector);
-    }, [closeContextMenu, setInspectorMode, startEditingElement]);
+        setVisualEditValues(readVisualEditValues(element));
+        setVisualEditElement(element);
+    }, [closeContextMenu, readVisualEditValues]);
 
     // Handle copy selector
     const handleCopySelector = useCallback((_selector: string) => {
@@ -245,13 +581,37 @@ export function InspectPreview({
         toast.success(t('Selector copied to clipboard'));
     }, [closeContextMenu, t]);
 
+    // Handle code edit from context menu
+    const handleViewCode = useCallback((element: InspectorElement, scope: SectionCodeEditScope) => {
+        closeContextMenu();
+
+        const selected = getIframeElement(element.cssSelector);
+        const target = selected ? findCodeEditTarget(selected, scope) : null;
+
+        if (!target) {
+            toast.error(t('Unable to read selected element code'));
+            return;
+        }
+
+        setSectionCodeElement(serializePreviewElement(target));
+        setSectionCodeOuterHtml(target.outerHTML);
+    }, [closeContextMenu, getIframeElement, t]);
+
+    const handleSectionCodeSaved = useCallback((response: SectionCodeSaveResponse) => {
+        if (response.warning) {
+            toast.warning(response.warning);
+        }
+
+        onVisualEditSaved?.(response);
+    }, [onVisualEditSaved]);
+
     // Handle save all edits
     const handleSaveAll = useCallback(async () => {
         if (!onSaveAllEdits) return;
         setIsSaving(true);
         try {
             await onSaveAllEdits();
-            toast.success(t('Changes sent to AI for processing'));
+            toast.success(t('Visual changes saved'));
         } catch {
             toast.error(t('Failed to save changes'));
         } finally {
@@ -285,49 +645,70 @@ export function InspectPreview({
             <div ref={containerRef} className="h-full w-full flex flex-col bg-background relative overflow-hidden">
                 <GradientBackground />
 
-                {/* Mode toggle bar - only in inspect mode */}
-                {mode === 'inspect' && (
-                    <div className="h-10 px-3 border-b flex items-center justify-between shrink-0 bg-background/80 backdrop-blur-sm z-20">
-                        <div className="flex items-center gap-1.5">
-                            <Button
-                                variant={inspectorMode === 'inspect' ? 'default' : 'outline'}
-                                size="sm"
-                                onClick={() => toggleInspectorMode('inspect')}
-                                className="h-7 px-3 text-xs"
-                                disabled={isBuilding || !isReady}
-                            >
-                                <MousePointerClick className="h-3.5 w-3.5 me-1.5" />
-                                {t('Select')}
-                            </Button>
-                            <Button
-                                variant={inspectorMode === 'edit' ? 'default' : 'outline'}
-                                size="sm"
-                                onClick={() => toggleInspectorMode('edit')}
-                                className="h-7 px-3 text-xs"
-                                disabled={isBuilding || !isReady}
-                            >
-                                <Edit2 className="h-3.5 w-3.5 me-1.5" />
-                                {t('Edit')}
-                            </Button>
-                        </div>
+                {/* Preview toolbar */}
+                <div className="h-10 px-3 border-b flex items-center justify-between shrink-0 bg-background/80 backdrop-blur-sm z-20">
+                    {mode === 'inspect' ? (
+                        <>
+                            <div className="flex items-center gap-1.5">
+                                <Button
+                                    variant={inspectorMode === 'inspect' ? 'default' : 'outline'}
+                                    size="sm"
+                                    onClick={() => toggleInspectorMode('inspect')}
+                                    className="h-7 px-3 text-xs"
+                                    disabled={isBuilding || !isReady}
+                                >
+                                    <MousePointerClick className="h-3.5 w-3.5 me-1.5" />
+                                    {t('Select')}
+                                </Button>
+                                <Button
+                                    variant={inspectorMode === 'edit' ? 'default' : 'outline'}
+                                    size="sm"
+                                    onClick={() => toggleInspectorMode('edit')}
+                                    className="h-7 px-3 text-xs"
+                                    disabled={isBuilding || !isReady}
+                                >
+                                    <Edit2 className="h-3.5 w-3.5 me-1.5" />
+                                    {t('Edit')}
+                                </Button>
+                            </div>
 
-                        <div className="flex items-center gap-2">
-                            {!isReady && !isBuilding && (
-                                <span className="text-xs text-muted-foreground flex items-center gap-1.5">
-                                    <Loader2 className="h-3 w-3 animate-spin" />
-                                    {t('Initializing...')}
-                                </span>
-                            )}
-                            {isReady && !isBuilding && (
-                                <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">
-                                    {inspectorMode === 'inspect'
-                                        ? t('Click any element to see options')
-                                        : t('Double-click text to edit inline')}
-                                </span>
-                            )}
+                            <div className="hidden md:flex items-center gap-2">
+                                {!isReady && !isBuilding && (
+                                    <span className="text-xs text-muted-foreground flex items-center gap-1.5">
+                                        <Loader2 className="h-3 w-3 animate-spin" />
+                                        {t('Initializing...')}
+                                    </span>
+                                )}
+                                {isReady && !isBuilding && (
+                                    <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">
+                                        {inspectorMode === 'inspect'
+                                            ? t('Click any element to see options')
+                                            : t('Double-click text to edit inline')}
+                                    </span>
+                                )}
+                            </div>
+                        </>
+                    ) : (
+                        <div className="text-xs text-muted-foreground">
+                            {activeDevice.label}
                         </div>
+                    )}
+
+                    <div className="flex items-center gap-1 rounded-md border bg-background p-0.5">
+                        {DEVICE_MODES.map((device) => (
+                            <Button
+                                key={device.id}
+                                variant={deviceMode === device.id ? 'secondary' : 'ghost'}
+                                size="icon"
+                                className="h-7 w-7"
+                                onClick={() => changeDeviceMode(device.id)}
+                                title={t(device.label)}
+                            >
+                                <device.icon className="h-3.5 w-3.5" />
+                            </Button>
+                        ))}
                     </div>
-                )}
+                </div>
 
                 {/* Main content area */}
                 <div className="flex-1 min-h-0 flex relative z-10">
@@ -343,15 +724,22 @@ export function InspectPreview({
                     )}
 
                     {/* iframe container */}
-                    <div className="flex-1 min-h-0 relative">
-                        <iframe
-                            ref={iframeRef}
-                            key={refreshTrigger}
-                            src={`${previewUrl}?t=${refreshTrigger}`}
-                            className="absolute inset-0 w-full h-full border-0"
-                            title="Preview"
-                            sandbox="allow-scripts allow-same-origin"
-                        />
+                    <div className="flex-1 min-h-0 relative bg-muted/30 overflow-auto">
+                        <div
+                            className={`h-full min-h-full bg-background transition-[width] duration-200 ${
+                                activeDevice.width ? 'mx-auto shadow-2xl ring-1 ring-border' : 'w-full'
+                            }`}
+                            style={activeDevice.width ? { width: activeDevice.width } : undefined}
+                        >
+                            <iframe
+                                ref={iframeRef}
+                                key={refreshTrigger}
+                                src={`${previewUrl}?t=${refreshTrigger}`}
+                                className="w-full h-full border-0 bg-background"
+                                title="Preview"
+                                sandbox="allow-scripts allow-same-origin"
+                            />
+                        </div>
 
                         {/* Confetti canvas */}
                         <canvas
@@ -410,10 +798,44 @@ export function InspectPreview({
                         onMention={handleMention}
                         onEdit={handleEdit}
                         onCopySelector={handleCopySelector}
+                        onViewCode={handleViewCode}
                         onClose={closeContextMenu}
                     />,
                     document.body
                 )}
+
+                <VisualEditModal
+                    open={!!visualEditElement}
+                    projectId={projectId}
+                    element={visualEditElement}
+                    initialValues={visualEditValues}
+                    previewPath={getCurrentPreviewPath()}
+                    onOpenChange={(open) => {
+                        if (!open) {
+                            setVisualEditElement(null);
+                            setVisualEditValues({});
+                        }
+                    }}
+                    onApplyPreview={applyVisualPreviewEdit}
+                    onRevertPreview={revertVisualPreviewEdit}
+                    onSaved={handleVisualEditSaved}
+                    onFileUploaded={onProjectFileUploaded}
+                />
+
+                <SectionCodeEditModal
+                    open={!!sectionCodeElement}
+                    projectId={projectId}
+                    element={sectionCodeElement}
+                    outerHTML={sectionCodeOuterHtml}
+                    previewPath={getCurrentPreviewPath()}
+                    onOpenChange={(open) => {
+                        if (!open) {
+                            setSectionCodeElement(null);
+                            setSectionCodeOuterHtml('');
+                        }
+                    }}
+                    onSaved={handleSectionCodeSaved}
+                />
             </div>
         );
     }

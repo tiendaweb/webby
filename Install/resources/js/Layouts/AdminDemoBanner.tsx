@@ -14,7 +14,7 @@ export function AdminDemoBanner() {
                     <Info className="h-4 w-4" />
                     <AlertTitle>Demo Mode</AlertTitle>
                     <AlertDescription>
-                        Settings are read-only and the environment resets every 3 hours. Register your own account to test the AI website builder.
+                        Settings are read-only and the environment resets every 3 hours. Register your own account to test the hosting workspace and optional AI assistant.
                     </AlertDescription>
                 </Alert>
             </div>

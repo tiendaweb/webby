@@ -10,6 +10,11 @@ use Symfony\Component\HttpFoundation\Response;
 
 class SetLocale
 {
+    private function defaultLocale(): string
+    {
+        return config('app.locale', 'es');
+    }
+
     /**
      * Handle an incoming request.
      */
@@ -20,13 +25,13 @@ class SetLocale
 
             // Validate locale exists and is active
             if (! Language::isValidCode($locale)) {
-                $locale = SystemSetting::get('default_locale', 'en');
+                $locale = SystemSetting::get('default_locale', $this->defaultLocale());
             }
 
             app()->setLocale($locale);
         } catch (\Exception $e) {
             // Database not available (fresh install), use default
-            app()->setLocale('en');
+            app()->setLocale($this->defaultLocale());
         }
 
         return $next($request);
@@ -48,6 +53,6 @@ class SetLocale
         }
 
         // Priority 3: System default
-        return SystemSetting::get('default_locale', 'en');
+        return SystemSetting::get('default_locale', $this->defaultLocale());
     }
 }

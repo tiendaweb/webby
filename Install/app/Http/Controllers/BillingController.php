@@ -30,10 +30,10 @@ class BillingController extends Controller
             ->with('plan')
             ->first();
 
-        // Get pending bank transfer subscription (if any)
+        // Get a purchase awaiting manual confirmation (if any)
         $pendingSubscription = $user->subscriptions()
             ->where('status', Subscription::STATUS_PENDING)
-            ->where('payment_method', Subscription::PAYMENT_BANK_TRANSFER)
+            ->whereIn('payment_method', [Subscription::PAYMENT_BANK_TRANSFER, Subscription::PAYMENT_MANUAL])
             ->with('plan')
             ->first();
 
@@ -130,7 +130,7 @@ class BillingController extends Controller
 
         $currency = \App\Helpers\CurrencyHelper::getCode();
 
-        return $plugins->filter(function ($plugin) use ($currency) {
+        $gateways = $plugins->filter(function ($plugin) use ($currency) {
             $gateway = $plugin->getInstance();
             $supported = $gateway->getSupportedCurrencies();
 
@@ -148,5 +148,18 @@ class BillingController extends Controller
                 'requires_manual_approval' => method_exists($gateway, 'requiresManualApproval') ? $gateway->requiresManualApproval() : false,
             ];
         })->values()->toArray();
+
+        if (! collect($gateways)->contains('slug', Subscription::PAYMENT_MANUAL)) {
+            $gateways[] = [
+                'slug' => Subscription::PAYMENT_MANUAL,
+                'name' => 'Manual — pending confirmation',
+                'description' => 'Register the purchase now; an administrator confirms the payment and activates the plan credits.',
+                'icon' => '',
+                'supports_auto_renewal' => false,
+                'requires_manual_approval' => true,
+            ];
+        }
+
+        return $gateways;
     }
 }

@@ -1,0 +1,36 @@
+{
+    "suggestions": {
+        "1": "Alojar un sitio de portafolio",
+        "2": "Importar una landing existente",
+        "3": "Publicar un sitio PHP de contacto",
+        "4": "Editar un sitio React de marketing"
+    },
+    "typing_prompts": {
+        "1": "Subir y alojar mi sitio de portafolio...",
+        "2": "Importar esta landing y hacerla responsive...",
+        "3": "Crear un sitio estático desde este HTML...",
+        "4": "Publicar una página PHP de contacto con buen diseño...",
+        "5": "Editar los textos y colores del inicio existente...",
+        "6": "Convertir esta app Vite en un sitio alojado...",
+        "7": "Preparar una página de producto para publicar...",
+        "8": "Revisar este proyecto antes de publicarlo..."
+    },
+    "greetings": {
+        "1": "¿Qué sitio quieres alojar, {name}?",
+        "2": "¿Qué deberíamos publicar, {name}?",
+        "3": "¿Qué te gustaría editar, {name}?",
+        "4": "¿Qué sitio puedo ayudarte a gestionar, {name}?"
+    },
+    "hero_headlines": {
+        "1": "Aloja y edita tus sitios en un lugar",
+        "2": "Publica tu workspace web hoy",
+        "3": "Edición en vivo para sitios alojados",
+        "4": "Gestiona sitios existentes con control"
+    },
+    "hero_subtitles": {
+        "1": "Importa, edita, previsualiza y publica sitios estáticos o PHP.",
+        "2": "Usa el editor visual, el editor de código y el asistente IA opcional juntos.",
+        "3": "Gestiona archivos alojados, dominios, previews y revisiones desde un workspace.",
+        "4": "Edita código existente en vivo y publica cuando esté listo."
+    }
+}

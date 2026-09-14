@@ -38,6 +38,7 @@ export interface ProjectFilters {
     search?: string | null;
     sort: ProjectSort;
     visibility?: ProjectVisibility | null;
+    per_page?: number;
 }
 
 export interface PaginatedData<T> {
@@ -71,6 +72,8 @@ export interface Template {
     description: string | null;
     thumbnail: string | null;
     is_system: boolean;
+    category?: string | null;
+    metadata?: Record<string, string> | null;
     plans?: Plan[];
     plan_ids?: number[];
 }
@@ -137,6 +140,9 @@ export interface CreateProps extends PageProps {
     isPusherConfigured: boolean;
     canCreateProject: boolean;
     cannotCreateReason: string | null;
+    canUseAiAssistant: boolean;
+    cannotUseAiReason: string | null;
+    codeCanvasAvailable: boolean;
     suggestions: string[];
     typingPrompts: string[];
     greeting: string;

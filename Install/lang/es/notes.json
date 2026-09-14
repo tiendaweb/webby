@@ -1,0 +1,21 @@
+{
+    "AI": "IA",
+    "Answered by the connector": "Respondido por el conector",
+    "Chat": "Chat",
+    "Could not save the note.": "No se pudo guardar la nota.",
+    "Details": "Detalle",
+    "Files": "Archivos",
+    "Leave a note for the connectors — what should they do?": "Dejá una nota para los conectores — ¿qué tienen que hacer?",
+    "Note": "Nota",
+    "Note for connectors": "Nota para los conectores",
+    "Note saved. A connector can pick it up — the AI builder was not called.": "Nota guardada. Un conector puede tomarla — no se llamó al constructor de IA.",
+    "Save as a note for the connectors": "Guardar como nota para los conectores",
+    "Saved for the connectors — the AI builder is not called": "Se guarda para los conectores — no se llama al constructor de IA",
+    "Send to the AI builder": "Enviar al constructor de IA",
+    "No AI provider is configured. Send saves the prompt for a connector.": "No hay un proveedor de IA configurado. Enviar guarda el prompt para un conector.",
+    "a connector is on it": "un conector la está haciendo",
+    "cancelled": "cancelada",
+    "done": "listo",
+    "failed": "falló",
+    "waiting for a connector": "esperando a un conector"
+}

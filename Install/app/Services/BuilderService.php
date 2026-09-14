@@ -74,6 +74,7 @@ class BuilderService
 
         // Get default base URL for the provider type
         $baseUrl = AiProvider::DEFAULT_BASE_URLS[$provider] ?? '';
+        $transportType = AiProvider::transportTypeFor($provider);
 
         // If no preferred model, use the first default for the provider type
         if (empty($model)) {
@@ -81,26 +82,26 @@ class BuilderService
         }
 
         return [
-            'provider' => $provider,
+            'provider' => $transportType,
             'agent' => [
                 'api_key' => $apiKey,
                 'base_url' => $baseUrl,
                 'model' => $model,
                 'max_tokens' => 8192,
-                'provider_type' => $provider,
+                'provider_type' => $transportType,
             ],
             'summarizer' => [
                 'api_key' => $apiKey,
                 'base_url' => $baseUrl,
                 'model' => $model, // Use same model as agent for consistency
                 'max_tokens' => 1500, // Default for user's own key
-                'provider_type' => $provider,
+                'provider_type' => $transportType,
             ],
             'suggestions' => [
                 'api_key' => $apiKey,
                 'base_url' => $baseUrl,
                 'model' => $model, // Use same model as agent for consistency
-                'provider_type' => $provider,
+                'provider_type' => $transportType,
             ],
         ];
     }
@@ -410,6 +411,36 @@ class BuilderService
     }
 
     /**
+     * Rename a file or directory in a builder workspace.
+     */
+    public function renamePath(Builder $builder, string $workspaceId, string $from, string $to): array
+    {
+        $response = Http::timeout(10)
+            ->withHeaders(['X-Server-Key' => $builder->server_key])
+            ->patch("{$builder->full_url}/api/path-workspace/{$workspaceId}", [
+                'from' => $from,
+                'to' => $to,
+        ]);
+
+        if (! $response->successful()) {
+            $message = $response->json('error')
+                ?? $response->json('message');
+
+            if (! $message && $response->status() === 404) {
+                $message = 'Builder does not support path renaming or the source path was not found.';
+            }
+
+            $message = $message
+                ?? trim($response->body())
+                ?: 'Failed to rename path';
+
+            throw new \RuntimeException($message, $response->status());
+        }
+
+        return $response->json() ?: ['success' => true, 'path' => $to];
+    }
+
+    /**
      * Trigger a build on the builder and download the output.
      */
     public function triggerBuild(Builder $builder, string $workspaceId, int|string|null $projectId = null): array
@@ -427,7 +458,7 @@ class BuilderService
         // If project ID provided, download and extract build output
         if ($projectId && ($result['success'] ?? false)) {
             $this->downloadAndExtractBuildOutput($builder, $workspaceId, $projectId);
-            $result['preview_url'] = "/preview/{$projectId}";
+            $result['preview_url'] = "/preview/{$projectId}/";
         }
 
         return $result;

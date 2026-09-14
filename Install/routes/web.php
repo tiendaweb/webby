@@ -2,6 +2,8 @@
 
 use App\Http\Controllers\AccountDeletionController;
 use App\Http\Controllers\BlankProjectController;
+use App\Http\Controllers\Admin\AdminAiConnectorController;
+use App\Http\Controllers\Admin\AdminApiTokenController;
 use App\Http\Controllers\Admin\AdminCronjobController;
 use App\Http\Controllers\Admin\AdminLanguageController;
 use App\Http\Controllers\Admin\AdminPlanController;
@@ -23,23 +25,36 @@ use App\Http\Controllers\ChatController;
 use App\Http\Controllers\CookieConsentController;
 use App\Http\Controllers\CreateController;
 use App\Http\Controllers\DatabaseController;
+use App\Http\Controllers\DatabaseCrudController;
 use App\Http\Controllers\DataExportController;
 use App\Http\Controllers\DocumentationController;
 use App\Http\Controllers\FileManagerController;
 use App\Http\Controllers\InstallController;
 use App\Http\Controllers\LocaleController;
+use App\Http\Controllers\McpConnectController;
+use App\Http\Controllers\Oauth\AuthorizationController as OAuthAuthorizationController;
+use App\Http\Controllers\Oauth\DiscoveryController as OAuthDiscoveryController;
+use App\Http\Controllers\McpImpersonateController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PaymentGatewayController;
 use App\Http\Controllers\PreviewController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProjectController;
+use App\Http\Controllers\ProjectColorController;
+use App\Http\Controllers\ProjectAiConnectorController;
+use App\Http\Controllers\ProjectNoteController;
 use App\Http\Controllers\ProjectCustomDomainController;
 use App\Http\Controllers\ProjectFileController;
 use App\Http\Controllers\ProjectFirebaseController;
 use App\Http\Controllers\ProjectPublishController;
+use App\Http\Controllers\ProjectRevisionController;
+use App\Http\Controllers\ProjectSeoController;
 use App\Http\Controllers\ProjectSettingsController;
+use App\Http\Controllers\ProjectStructureController;
 use App\Http\Controllers\ReferralController;
 use App\Http\Controllers\ReferralTrackingController;
+use App\Http\Controllers\SectionCodeEditController;
+use App\Http\Controllers\VisualEditController;
 use App\Http\Controllers\UpgradeController;
 use App\Models\Project;
 use App\Models\SystemSetting;
@@ -99,37 +114,23 @@ if (config('app.env') === 'local' && config('app.demo')) {
 */
 Route::middleware('installed')->group(function () {
 
-    Route::get('/', function () {
-        // Check if landing page is enabled
-        if (! SystemSetting::get('landing_page_enabled', true)) {
-            // If user is already authenticated, redirect to create page instead of login
-            if (auth()->check()) {
-                return redirect()->route('create');
-            }
-
-            return redirect()->route('login');
-        }
-
-        // Get landing page config from database
-        $landingPageService = app(\App\Services\LandingPageService::class);
-        $internalAiService = app(\App\Services\InternalAiService::class);
+    // Helper closure reused for both / and /{slug}
+    $renderLanding = function (?\App\Models\LandingPage $page, array $pageConfig) {
         $locale = app()->getLocale();
-        $pageConfig = $landingPageService->getPageConfig($locale);
+        $internalAiService = app(\App\Services\InternalAiService::class);
 
-        // Get translated content from InternalAiService
         try {
-            $allHeadlines = $internalAiService->getHeroHeadlines(4, $locale);
-            $allSubtitles = $internalAiService->getHeroSubtitles(4, $locale);
-            $fallbackSuggestions = $internalAiService->getSuggestions(4, $locale);
+            $allHeadlines          = $internalAiService->getHeroHeadlines(4, $locale);
+            $allSubtitles          = $internalAiService->getHeroSubtitles(4, $locale);
+            $fallbackSuggestions   = $internalAiService->getSuggestions(4, $locale);
             $fallbackTypingPrompts = $internalAiService->getTypingPrompts(8, $locale);
         } catch (\Exception $e) {
-            $allHeadlines = \App\Services\InternalAiService::STATIC_HERO_HEADLINES;
-            $allSubtitles = \App\Services\InternalAiService::STATIC_HERO_SUBTITLES;
-            $fallbackSuggestions = \App\Services\InternalAiService::getStaticSuggestions($locale);
+            $allHeadlines          = \App\Services\InternalAiService::STATIC_HERO_HEADLINES;
+            $allSubtitles          = \App\Services\InternalAiService::STATIC_HERO_SUBTITLES;
+            $fallbackSuggestions   = \App\Services\InternalAiService::getStaticSuggestions($locale);
             $fallbackTypingPrompts = \App\Services\InternalAiService::getStaticTypingPrompts($locale);
         }
 
-        // Pick ONE random headline and subtitle (like /create does with greetings)
         $randomHeadline = ! empty($allHeadlines)
             ? $allHeadlines[random_int(0, count($allHeadlines) - 1)]
             : \App\Services\InternalAiService::STATIC_HERO_HEADLINES[0];
@@ -137,14 +138,12 @@ Route::middleware('installed')->group(function () {
             ? $allSubtitles[random_int(0, count($allSubtitles) - 1)]
             : \App\Services\InternalAiService::STATIC_HERO_SUBTITLES[0];
 
-        // Override hero section content with translated values from InternalAiService
-        // This ensures proper translation when locale-specific DB content doesn't exist
         if (isset($pageConfig['sections'])) {
             foreach ($pageConfig['sections'] as &$section) {
                 if ($section['type'] === 'hero') {
-                    $section['content']['headlines'] = [$randomHeadline];
-                    $section['content']['subtitles'] = [$randomSubtitle];
-                    $section['content']['suggestions'] = $fallbackSuggestions;
+                    $section['content']['headlines']     = [$randomHeadline];
+                    $section['content']['subtitles']     = [$randomSubtitle];
+                    $section['content']['suggestions']   = $fallbackSuggestions;
                     $section['content']['typing_prompts'] = $fallbackTypingPrompts;
                     break;
                 }
@@ -152,45 +151,65 @@ Route::middleware('installed')->group(function () {
             unset($section);
         }
 
-        // Get active plans for pricing section
         $plans = \App\Models\Plan::active()
             ->orderBy('sort_order')
             ->get(['id', 'name', 'slug', 'description', 'price', 'billing_period',
                 'features', 'is_popular', 'max_projects', 'monthly_build_credits',
                 'allow_user_ai_api_key']);
 
-        // For logged-in users, check project creation eligibility
-        $canCreateProject = true;
+        $canCreateProject  = true;
         $cannotCreateReason = null;
         $isPusherConfigured = true;
 
         if (auth()->check()) {
-            $broadcastService = app(BroadcastService::class);
+            $broadcastService   = app(\App\Services\BroadcastService::class);
             $isPusherConfigured = $broadcastService->isConfigured();
-
-            $buildCreditService = app(BuildCreditService::class);
-            $canBuildResult = $buildCreditService->canPerformBuild(auth()->user());
-            $canCreateProject = $canBuildResult['allowed'];
+            $buildCreditService = app(\App\Services\BuildCreditService::class);
+            $canBuildResult     = $buildCreditService->canPerformBuild(auth()->user());
+            $canCreateProject   = $canBuildResult['allowed'];
             $cannotCreateReason = $canBuildResult['reason'];
         }
 
         return Inertia::render('Landing', array_merge($pageConfig, [
-            'canLogin' => Route::has('login'),
-            'canRegister' => Route::has('register') && SystemSetting::get('enable_registration', true),
-            'plans' => $plans,
+            'canLogin'           => Route::has('login'),
+            'canRegister'        => Route::has('register') && SystemSetting::get('enable_registration', true),
+            'plans'              => $plans,
             'isPusherConfigured' => $isPusherConfigured,
-            'canCreateProject' => $canCreateProject,
+            'canCreateProject'   => $canCreateProject,
             'cannotCreateReason' => $cannotCreateReason,
-            'statistics' => Cache::remember('landing_stats', 3600, fn () => [
-                'usersCount' => User::count(),
+            'statistics'         => Cache::remember('landing_stats', 3600, fn () => [
+                'usersCount'   => User::count(),
                 'projectsCount' => Project::count(),
             ]),
-            // Legacy props for fallback (used when database content is empty)
-            'headline' => $allHeadlines[0] ?? null,
-            'subtitle' => $allSubtitles[0] ?? null,
-            'suggestions' => $fallbackSuggestions,
+            'headline'      => $allHeadlines[0] ?? null,
+            'subtitle'      => $allSubtitles[0] ?? null,
+            'suggestions'   => $fallbackSuggestions,
             'typingPrompts' => $fallbackTypingPrompts,
         ]));
+    };
+
+    Route::get('/', function () use ($renderLanding) {
+        if (auth()->check()) {
+            return redirect()->route('projects.index');
+        }
+
+        if (! SystemSetting::get('landing_page_enabled', true)) {
+            return redirect()->route('login');
+        }
+
+        $landingPageService = app(\App\Services\LandingPageService::class);
+        $locale     = app()->getLocale();
+
+        $homePage = \App\Models\LandingPage::where('is_home', true)->where('is_active', true)->first();
+        if ($homePage && $homePage->isHtmlCode()) {
+            $html = $landingPageService->getPageHtmlCode($homePage->id);
+            return response($html ?: '<!DOCTYPE html><html><body></body></html>')
+                ->header('Content-Type', 'text/html; charset=utf-8');
+        }
+
+        $pageConfig = $landingPageService->getHomePageConfig($locale);
+
+        return $renderLanding(null, $pageConfig);
     })->name('welcome');
 
     Route::get('/landing/ai-content', [CreateController::class, 'landingAiContent'])
@@ -226,6 +245,10 @@ Route::middleware('installed')->group(function () {
         ->middleware(['auth', 'verified'])
         ->name('create.ai-content');
 
+    Route::post('/create/template-recommendations', [CreateController::class, 'templateRecommendations'])
+        ->middleware(['auth', 'verified'])
+        ->name('create.template-recommendations');
+
     // Project chat routes
     Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/project/{project}', [ChatController::class, 'show'])->name('chat');
@@ -246,6 +269,19 @@ Route::middleware('installed')->group(function () {
         Route::post('/project/{project}/api-token', [ProjectSettingsController::class, 'generateApiToken']);
         Route::post('/project/{project}/api-token/regenerate', [ProjectSettingsController::class, 'regenerateApiToken']);
         Route::delete('/project/{project}/api-token', [ProjectSettingsController::class, 'revokeApiToken']);
+
+        // Chat notes for the connectors — messages that are stored for an
+        // MCP assistant to act on instead of being sent to the AI builder.
+        Route::get('/project/{project}/notes', [ProjectNoteController::class, 'index'])->name('project.notes.index');
+        Route::post('/project/{project}/notes', [ProjectNoteController::class, 'store'])->name('project.notes.store');
+        Route::patch('/project/{project}/notes/{note}', [ProjectNoteController::class, 'update'])->name('project.notes.update');
+
+        // AI Connector module (MCP) — activation and connector-token management, separate from api-token above.
+        Route::get('/project/{project}/ai-connector', [ProjectAiConnectorController::class, 'show'])->name('project.ai-connector.show');
+        Route::post('/project/{project}/ai-connector/activate', [ProjectAiConnectorController::class, 'activate'])->name('project.ai-connector.activate');
+        Route::post('/project/{project}/ai-connector/deactivate', [ProjectAiConnectorController::class, 'deactivate'])->name('project.ai-connector.deactivate');
+        Route::post('/project/{project}/ai-connector/tokens', [ProjectAiConnectorController::class, 'storeToken'])->name('project.ai-connector.tokens.store');
+        Route::delete('/project/{project}/ai-connector/tokens/{token}', [ProjectAiConnectorController::class, 'destroyToken'])->name('project.ai-connector.tokens.destroy');
     });
 
     // Publishing
@@ -269,8 +305,15 @@ Route::middleware('installed')->group(function () {
         Route::get('/projects', [ProjectController::class, 'index'])->name('projects.index');
         Route::post('/projects', [ProjectController::class, 'store'])->name('projects.store');
         Route::get('/projects/trash', [ProjectController::class, 'trash'])->name('projects.trash');
+        // JSON para el selector rápido del builder (ver ProjectController@switcher).
+        Route::get('/projects/switcher', [ProjectController::class, 'switcher'])->name('projects.switcher');
         Route::post('/projects/{project}/toggle-star', [ProjectController::class, 'toggleStar'])->name('projects.toggle-star');
+        Route::put('/projects/{project}/rename', [ProjectController::class, 'rename'])->name('projects.rename');
         Route::post('/projects/{project}/duplicate', [ProjectController::class, 'duplicate'])->name('projects.duplicate');
+        // Firmada y con caducidad: el enlace lo emite una herramienta de
+        // conector y viaja por una conversación (ver ProjectController@export).
+        Route::get('/projects/{project}/export', [ProjectController::class, 'export'])
+            ->middleware('signed')->name('projects.export');
         Route::delete('/projects/{project}', [ProjectController::class, 'destroy'])->name('projects.destroy');
         Route::post('/projects/{project}/restore', [ProjectController::class, 'restore'])->withTrashed()->name('projects.restore');
         Route::delete('/projects/{project}/force-delete', [ProjectController::class, 'forceDelete'])->withTrashed()->name('projects.force-delete');
@@ -279,9 +322,14 @@ Route::middleware('installed')->group(function () {
     // Blank Projects routes (for static HTML/CSS/JS projects)
     Route::middleware(['auth', 'verified'])->prefix('api')->group(function () {
         Route::post('/blank-project/create', [BlankProjectController::class, 'createBlank'])->name('blank-project.create');
+        Route::post('/blank-project/code', [BlankProjectController::class, 'createFromCode'])->name('blank-project.code.create');
+        Route::post('/blank-project/from-template', [BlankProjectController::class, 'createFromTemplate'])->name('blank-project.from-template');
         Route::post('/blank-project/{project}/upload-files', [BlankProjectController::class, 'uploadFiles'])->name('blank-project.upload-files');
         Route::post('/blank-project/{project}/upload-zip', [BlankProjectController::class, 'uploadZip'])->name('blank-project.upload-zip');
         Route::get('/blank-project/{project}/files', [BlankProjectController::class, 'getFiles'])->name('blank-project.files');
+        Route::post('/blank-project/{project}/file', [BlankProjectController::class, 'createFile'])->name('blank-project.file.create');
+        Route::post('/blank-project/{project}/folder', [BlankProjectController::class, 'createFolder'])->name('blank-project.folder.create');
+        Route::delete('/blank-project/{project}/path', [BlankProjectController::class, 'deletePath'])->name('blank-project.path.delete');
         Route::post('/blank-project/{project}/preview', [BlankProjectController::class, 'generatePreview'])->name('blank-project.preview');
         Route::post('/blank-project/{project}/publish', [BlankProjectController::class, 'publish'])->name('blank-project.publish');
     });
@@ -294,6 +342,16 @@ Route::middleware('installed')->group(function () {
     // Database (Firebase) routes
     Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/database', [DatabaseController::class, 'index'])->name('database.index');
+        Route::get('/database/api', [DatabaseCrudController::class, 'index'])->name('database.crud.index');
+        Route::get('/database/api/tables', [DatabaseCrudController::class, 'tables'])->name('database.crud.tables');
+        Route::get('/database/api/tables/{table}/rows', [DatabaseCrudController::class, 'rows'])->name('database.crud.rows');
+        Route::post('/database/api/tables', [DatabaseCrudController::class, 'createTable'])->name('database.crud.tables.create');
+        Route::put('/database/api/tables/{table}', [DatabaseCrudController::class, 'renameTable'])->name('database.crud.tables.rename');
+        Route::delete('/database/api/tables/{table}', [DatabaseCrudController::class, 'destroyTable'])->name('database.crud.tables.destroy');
+        Route::post('/database/api/tables/{table}/columns', [DatabaseCrudController::class, 'addColumn'])->name('database.crud.columns.create');
+        Route::post('/database/api/tables/{table}/rows', [DatabaseCrudController::class, 'storeRow'])->name('database.crud.rows.store');
+        Route::put('/database/api/tables/{table}/rows/{rowKey}', [DatabaseCrudController::class, 'updateRow'])->name('database.crud.rows.update');
+        Route::delete('/database/api/tables/{table}/rows/{rowKey}', [DatabaseCrudController::class, 'destroyRow'])->name('database.crud.rows.destroy');
         Route::get('/firebase/collections', [\App\Http\Controllers\FirebaseCollectionController::class, 'index'])->name('firebase.collections');
     });
 
@@ -304,6 +362,19 @@ Route::middleware('installed')->group(function () {
         Route::get('/project/{project}/files/{file}', [ProjectFileController::class, 'show'])->name('project.file.serve');
         Route::delete('/project/{project}/files/{file}', [ProjectFileController::class, 'destroy'])->name('project.files.destroy');
         Route::get('/project/{project}/files-usage', [ProjectFileController::class, 'usage'])->name('project.files.usage');
+        Route::post('/project/{project}/visual-edits', [VisualEditController::class, 'store'])->name('project.visual-edits.store');
+        Route::post('/project/{project}/section-code/resolve', [SectionCodeEditController::class, 'resolve'])->name('project.section-code.resolve');
+        Route::post('/project/{project}/section-code/save', [SectionCodeEditController::class, 'save'])->name('project.section-code.save');
+        Route::get('/project/{project}/revisions', [ProjectRevisionController::class, 'index'])->name('project.revisions.index');
+        Route::post('/project/{project}/revisions', [ProjectRevisionController::class, 'store'])->name('project.revisions.store');
+        Route::post('/project/{project}/revisions/{revision}/restore', [ProjectRevisionController::class, 'restore'])->name('project.revisions.restore');
+        Route::get('/project/{project}/structure', [ProjectStructureController::class, 'show'])->name('project.structure.show');
+        Route::post('/project/{project}/structure/actions', [ProjectStructureController::class, 'action'])->name('project.structure.action');
+        Route::get('/project/{project}/seo', [ProjectSeoController::class, 'index'])->name('project.seo.index');
+        Route::put('/project/{project}/seo', [ProjectSeoController::class, 'update'])->name('project.seo.update');
+        Route::post('/project/{project}/publish-audit', [ProjectSeoController::class, 'audit'])->name('project.publish.audit');
+        Route::get('/project/{project}/used-colors', [ProjectColorController::class, 'index'])->name('project.used-colors.index');
+        Route::post('/project/{project}/used-colors/replace', [ProjectColorController::class, 'replace'])->name('project.used-colors.replace');
     });
 
     // Project Firebase routes
@@ -348,6 +419,14 @@ Route::middleware('installed')->group(function () {
     // Public route for cancelling account deletion (via email link)
     Route::get('/account/cancel-deletion/{token}', [AccountDeletionController::class, 'cancel'])->name('account.cancel-deletion');
 
+    // Consumes a signed link minted by the admin_users_impersonate MCP tool.
+    // Not behind 'auth' — the signature itself (5 min TTL, single-use query
+    // params) is the credential, since the admin's MCP client has no shared
+    // browser session with whoever opens this link.
+    Route::get('/mcp/impersonate/{user}', [McpImpersonateController::class, 'consume'])
+        ->middleware('signed')
+        ->name('mcp.impersonate.consume');
+
     // Locale change (works for guests and authenticated users)
     Route::post('/locale', [LocaleController::class, 'update'])->name('locale.update');
 
@@ -360,6 +439,42 @@ Route::middleware('installed')->group(function () {
         Route::get('/referral', [ReferralController::class, 'index'])->name('billing.referral');
         Route::get('/usage', [BuildCreditController::class, 'index'])->name('billing.usage');
         Route::get('/usage/stats', [BuildCreditController::class, 'stats'])->name('billing.usage.stats');
+    });
+
+    // --- OAuth 2.1 for the MCP connectors ------------------------------
+    //
+    // How a connector uses these: it POSTs to /api/mcp/admin with no
+    // credential, the 401 names the protected-resource document, that names
+    // this issuer, the issuer's metadata names the registration/authorize/
+    // token endpoints, and only then does a browser reach the consent
+    // screen. Every document before the consent screen must be public —
+    // there is nobody authenticated yet to read them.
+    //
+    // The duplicated ".../api/mcp/admin" suffixes are the path-aware form of
+    // discovery (RFC 9728 §3.1): clients look for metadata under the
+    // resource's own path before falling back to the bare well-known URL.
+    Route::get('/.well-known/oauth-protected-resource', [OAuthDiscoveryController::class, 'protectedResource']);
+    Route::get('/.well-known/oauth-protected-resource/api/mcp/admin', [OAuthDiscoveryController::class, 'protectedResource']);
+    Route::get('/.well-known/oauth-authorization-server', [OAuthDiscoveryController::class, 'authorizationServer']);
+    Route::get('/.well-known/oauth-authorization-server/api/mcp/admin', [OAuthDiscoveryController::class, 'authorizationServer']);
+    // Some clients probe the OpenID document first and give up if it 404s.
+    Route::get('/.well-known/openid-configuration', [OAuthDiscoveryController::class, 'authorizationServer']);
+
+    // The consent screen. "verified" is deliberately not required: an
+    // administrator who has not confirmed their email can still sign in, and
+    // bouncing them here would strand the flow at a dead end inside Claude.
+    Route::middleware('auth')->group(function () {
+        Route::get('/oauth/authorize', [OAuthAuthorizationController::class, 'show'])->name('oauth.authorize');
+        Route::post('/oauth/authorize', [OAuthAuthorizationController::class, 'approve'])->name('oauth.authorize.approve');
+    });
+
+    // Connect — standalone section (deliberately not under /admin) for
+    // wiring this installation into Claude, ChatGPT or Grok over MCP.
+    Route::middleware(['auth', 'verified', 'admin'])->group(function () {
+        Route::get('/connect', [McpConnectController::class, 'index'])->name('connect');
+        Route::post('/connect/tokens', [McpConnectController::class, 'store'])->name('connect.tokens.store');
+        Route::delete('/connect/tokens/{token}', [McpConnectController::class, 'destroy'])->name('connect.tokens.destroy');
+        Route::delete('/connect/oauth-clients/{client}', [McpConnectController::class, 'destroyOauthClient'])->name('connect.oauth-clients.destroy');
     });
 
     // Admin Routes
@@ -467,6 +582,17 @@ Route::middleware('installed')->group(function () {
         Route::delete('ai-providers/{aiProvider}', [AiProviderController::class, 'destroy'])->name('admin.ai-providers.destroy');
         Route::post('ai-providers/{aiProvider}/test', [AiProviderController::class, 'testConnection'])->name('admin.ai-providers.test');
 
+        // AI Connector module (MCP) — catalog + activation oversight
+        Route::get('ai-connector', [AdminAiConnectorController::class, 'index'])->name('admin.ai-connector');
+        Route::post('ai-connector/modules', [AdminAiConnectorController::class, 'storeModule'])->name('admin.ai-connector.modules.store');
+        Route::put('ai-connector/modules/{module}', [AdminAiConnectorController::class, 'updateModule'])->name('admin.ai-connector.modules.update');
+        Route::post('ai-connector/activations/{activation}/review', [AdminAiConnectorController::class, 'reviewActivation'])->name('admin.ai-connector.activations.review');
+
+        // Admin MCP tokens (Sanctum) — authenticate /api/mcp/admin
+        Route::get('api-tokens', [AdminApiTokenController::class, 'index'])->name('admin.api-tokens');
+        Route::post('api-tokens', [AdminApiTokenController::class, 'store'])->name('admin.api-tokens.store');
+        Route::delete('api-tokens/{token}', [AdminApiTokenController::class, 'destroy'])->name('admin.api-tokens.destroy');
+
         // Templates
         Route::get('ai-templates', [AdminTemplateController::class, 'index'])->name('admin.ai-templates');
         Route::post('ai-templates', [AdminTemplateController::class, 'store'])->name('admin.ai-templates.store');
@@ -483,6 +609,16 @@ Route::middleware('installed')->group(function () {
         Route::put('landing-builder/sections/{section}/items', [\App\Http\Controllers\Admin\LandingBuilderController::class, 'updateItems'])->name('admin.landing-builder.section.items');
         Route::post('landing-builder/media', [\App\Http\Controllers\Admin\LandingBuilderController::class, 'uploadMedia'])->name('admin.landing-builder.media.upload');
         Route::delete('landing-builder/media', [\App\Http\Controllers\Admin\LandingBuilderController::class, 'deleteMedia'])->name('admin.landing-builder.media.delete');
+        // Landing page management
+        Route::post('landing-builder/pages', [\App\Http\Controllers\Admin\LandingBuilderController::class, 'storePage'])->name('admin.landing-builder.pages.store');
+        Route::put('landing-builder/pages/{landingPage}', [\App\Http\Controllers\Admin\LandingBuilderController::class, 'updatePage'])->name('admin.landing-builder.pages.update');
+        Route::delete('landing-builder/pages/{landingPage}', [\App\Http\Controllers\Admin\LandingBuilderController::class, 'destroyPage'])->name('admin.landing-builder.pages.destroy');
+        Route::post('landing-builder/pages/{landingPage}/set-home', [\App\Http\Controllers\Admin\LandingBuilderController::class, 'setHomePage'])->name('admin.landing-builder.pages.set-home');
+        Route::post('landing-builder/pages/{landingPage}/toggle-active', [\App\Http\Controllers\Admin\LandingBuilderController::class, 'togglePageActive'])->name('admin.landing-builder.pages.toggle-active');
+        Route::put('landing-builder/pages/{landingPage}/code', [\App\Http\Controllers\Admin\LandingBuilderController::class, 'updatePageCode'])->name('admin.landing-builder.pages.code');
+        Route::post('landing-builder/pages/{landingPage}/sections', [\App\Http\Controllers\Admin\LandingBuilderController::class, 'addSection'])->name('admin.landing-builder.pages.sections.add');
+        Route::delete('landing-builder/sections/{section}', [\App\Http\Controllers\Admin\LandingBuilderController::class, 'destroySection'])->name('admin.landing-builder.sections.destroy');
+        Route::post('landing-builder/generate-html', [\App\Http\Controllers\Admin\LandingBuilderController::class, 'generateHtml'])->name('admin.landing-builder.generate-html');
     });
 
     // Payment Gateway Routes (webhooks don't require auth)
@@ -509,6 +645,7 @@ Route::middleware('installed')->group(function () {
         Route::get('projects/{project}/files', [BuilderProxyController::class, 'getFiles'])->name('builder.files');
         Route::get('projects/{project}/file', [BuilderProxyController::class, 'getFile'])->name('builder.file');
         Route::put('projects/{project}/file', [BuilderProxyController::class, 'updateFile'])->name('builder.file.update');
+        Route::patch('projects/{project}/path', [BuilderProxyController::class, 'renamePath'])->name('builder.path.rename');
         Route::post('projects/{project}/build', [BuilderProxyController::class, 'triggerBuild'])->name('builder.build');
         Route::get('projects/{project}/build', fn (Project $project) => redirect()->route('chat', $project));
         Route::get('projects/{project}/suggestions', [BuilderProxyController::class, 'getSuggestions'])->name('builder.suggestions');
@@ -551,6 +688,36 @@ Route::middleware('installed')->group(function () {
 
     // Auth routes (also require installation)
     require __DIR__.'/auth.php';
+
+    // Public landing pages by slug (must be after all other routes)
+    Route::get('/{slug}', function (string $slug) use ($renderLanding) {
+        if (! SystemSetting::get('landing_page_enabled', true)) {
+            abort(404);
+        }
+
+        $landingPageService = app(\App\Services\LandingPageService::class);
+        $locale = app()->getLocale();
+
+        $page = \App\Models\LandingPage::where('slug', $slug)->where('is_active', true)->first();
+
+        if (! $page) {
+            abort(404);
+        }
+
+        if ($page->isHtmlCode()) {
+            $html = $landingPageService->getPageHtmlCode($page->id);
+            return response($html ?: '<!DOCTYPE html><html><body></body></html>')
+                ->header('Content-Type', 'text/html; charset=utf-8');
+        }
+
+        $pageConfig = $landingPageService->getPageConfigBySlug($slug, $locale);
+
+        if ($pageConfig === null) {
+            abort(404);
+        }
+
+        return $renderLanding(null, $pageConfig);
+    })->where('slug', '[a-z0-9\-]+')->name('landing.slug');
 
     // Fallback: ensures the web middleware group (including domain middlewares)
     // runs for ALL unmatched request paths. Without this, paths like /style.css

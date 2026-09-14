@@ -190,9 +190,30 @@ class BuilderWebhookController extends Controller
 
     protected function dispatchError(string $sessionId, array $data): bool
     {
+        $error = $data['error'] ?? 'Build failed';
+        $project = Project::where('build_session_id', $sessionId)->with('user')->first();
+
+        if ($project && $project->build_status === 'building') {
+            $project->update([
+                'build_status' => 'failed',
+                'build_completed_at' => now(),
+            ]);
+
+            if ($project->user) {
+                event(new ProjectStatusUpdatedEvent(
+                    $project->user->id,
+                    $project->id,
+                    'failed',
+                    $error
+                ));
+
+                $this->notificationService->notifyBuildFailed($project->user, $project, $error);
+            }
+        }
+
         BuilderErrorEvent::dispatch(
             $sessionId,
-            $data['error'] ?? ''
+            $error
         );
 
         return true;

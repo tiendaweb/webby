@@ -32,7 +32,7 @@ trait HandlesLocale
             return $notifiable->getLocale();
         }
 
-        return SystemSetting::get('default_locale', 'en');
+        return SystemSetting::get('default_locale', config('app.locale', 'es'));
     }
 
     /**
@@ -41,6 +41,6 @@ trait HandlesLocale
     protected function getAdminLocale(): string
     {
         return SystemSetting::get('admin_email_locale')
-            ?? SystemSetting::get('default_locale', 'en');
+            ?? SystemSetting::get('default_locale', config('app.locale', 'es'));
     }
 }

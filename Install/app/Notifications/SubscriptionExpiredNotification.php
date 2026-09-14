@@ -47,7 +47,7 @@ class SubscriptionExpiredNotification extends Notification implements ShouldQueu
                 ->subject(__('Your Subscription Has Expired - :appName', ['appName' => $emailData['appName']]))
                 ->view('emails.user.subscription-expired', array_merge($emailData, [
                     'planName' => $plan?->name ?? 'N/A',
-                    'dashboardUrl' => route('create'),
+                    'dashboardUrl' => route('projects.index'),
                 ]));
         });
     }

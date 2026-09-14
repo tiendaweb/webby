@@ -59,6 +59,9 @@ class ChatController extends Controller
         $user = request()->user();
         $plan = $user->getCurrentPlan();
         $baseDomain = SystemSetting::get('domain_base_domain', config('app.base_domain', 'example.com'));
+        $availableBuilder = $project->builder ?: $plan?->getBuilderWithFallbacks();
+        $hasAiProvider = $user->isUsingOwnAiApiKey()
+            || $plan?->getAiProviderWithFallbacks() !== null;
 
         // Firebase settings
         $firebaseSettings = null;
@@ -101,11 +104,14 @@ class ChatController extends Controller
 
         return Inertia::render('Chat', [
             'project' => [
-                ...$project->only('id', 'name', 'initial_prompt'),
+                ...$project->only('id', 'name', 'initial_prompt', 'type'),
                 'has_history' => ! empty($project->conversation_history),
                 'conversation_history' => $project->conversation_history ?? [],
                 'preview_url' => $previewUrl,
                 'has_active_session' => $hasActiveSession,
+                'has_builder' => ! empty($project->builder_id),
+                'ai_provider_available' => $hasAiProvider,
+                'can_use_ai_builder' => $availableBuilder !== null && $hasAiProvider,
                 'build_session_id' => $project->build_session_id,
                 'build_status' => $project->build_status,
                 'can_reconnect' => $canReconnect,

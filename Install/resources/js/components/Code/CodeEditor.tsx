@@ -7,6 +7,7 @@ import { Loader2, Lock, Save } from 'lucide-react';
 import axios from 'axios';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useTranslation } from '@/contexts/LanguageContext';
+import { StructuredJsonEditor, JsonValue } from '@/components/Data/StructuredJsonEditor';
 
 // Protected files that cannot be edited via the code editor.
 // Must match the Go backend's executor.ProtectedWriteFiles list.
@@ -30,9 +31,11 @@ interface CodeEditorProps {
     projectId: string;
     selectedFile: string | null;
     onSave?: () => void;
+    allowProtectedEdits?: boolean;
+    refreshTrigger?: number;
 }
 
-export function CodeEditor({ projectId, selectedFile, onSave }: CodeEditorProps) {
+export function CodeEditor({ projectId, selectedFile, onSave, allowProtectedEdits = false, refreshTrigger = 0 }: CodeEditorProps) {
     const { t } = useTranslation();
     const [content, setContent] = useState('');
     const [originalContent, setOriginalContent] = useState('');
@@ -68,7 +71,7 @@ export function CodeEditor({ projectId, selectedFile, onSave }: CodeEditorProps)
             setContent('');
             setOriginalContent('');
         }
-    }, [selectedFile, fetchFile]);
+    }, [selectedFile, fetchFile, refreshTrigger]);
 
     const handleSave = async () => {
         if (!selectedFile || content === originalContent) return;
@@ -95,8 +98,9 @@ export function CodeEditor({ projectId, selectedFile, onSave }: CodeEditorProps)
 
     const isReadOnly = useMemo(() => {
         if (!selectedFile) return false;
+        if (allowProtectedEdits) return false;
         return PROTECTED_FILES.includes(selectedFile);
-    }, [selectedFile]);
+    }, [selectedFile, allowProtectedEdits]);
 
     // Keyboard shortcut for save (Cmd/Ctrl+S)
     useEffect(() => {
@@ -133,12 +137,30 @@ export function CodeEditor({ projectId, selectedFile, onSave }: CodeEditorProps)
                 return 'json';
             case 'md':
                 return 'markdown';
+            case 'php':
+                return 'php';
             default:
                 return 'plaintext';
         }
     };
 
     const hasChanges = content !== originalContent;
+
+    const parsedJson = useMemo(() => {
+        if (!selectedFile || selectedFile.split('.').pop()?.toLowerCase() !== 'json' || content.trim() === '') {
+            return null;
+        }
+
+        try {
+            return JSON.parse(content) as JsonValue;
+        } catch {
+            return null;
+        }
+    }, [selectedFile, content]);
+
+    const handleStructuredJsonChange = useCallback((nextValue: JsonValue) => {
+        setContent(`${JSON.stringify(nextValue, null, 2)}\n`);
+    }, []);
 
     const handleEditorWillMount: BeforeMount = (monaco) => {
         // Configure TypeScript compiler options for JSX/TSX support
@@ -270,6 +292,13 @@ export function CodeEditor({ projectId, selectedFile, onSave }: CodeEditorProps)
                             <Skeleton className="h-4 w-52" />
                         </div>
                     </div>
+                ) : parsedJson !== null ? (
+                    <StructuredJsonEditor
+                        projectId={projectId}
+                        value={parsedJson}
+                        onChange={handleStructuredJsonChange}
+                        readOnly={isReadOnly}
+                    />
                 ) : (
                     <Editor
                         height="100%"

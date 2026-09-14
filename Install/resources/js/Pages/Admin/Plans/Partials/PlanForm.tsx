@@ -15,7 +15,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { Bot, Server, Loader2, Coins, Key, FolderOpen, Globe, Database, HardDrive } from 'lucide-react';
+import { Bot, Server, Loader2, Coins, Key, FolderOpen, Globe, Database, HardDrive, Terminal } from 'lucide-react';
 import FeatureManager, { type PlanFeature } from './FeatureManager';
 import type { BillingPeriod } from '@/types/billing';
 
@@ -61,6 +61,7 @@ interface Plan {
     max_storage_mb: number | null;
     max_file_size_mb: number;
     allowed_file_types: string[] | null;
+    enable_php_runtime: boolean;
 }
 
 interface DomainSettings {
@@ -112,6 +113,7 @@ export default function PlanForm({ plan, aiProviders, builders, domainSettings, 
         max_storage_mb: plan?.max_storage_mb ?? null as number | null,
         max_file_size_mb: plan?.max_file_size_mb ?? 10,
         allowed_file_types: plan?.allowed_file_types ?? null as string[] | null,
+        enable_php_runtime: plan?.enable_php_runtime ?? true,
     });
 
     const handleSubmit = (e: React.FormEvent) => {
@@ -516,17 +518,17 @@ export default function PlanForm({ plan, aiProviders, builders, domainSettings, 
                         </CardContent>
                     </Card>
 
-                    {/* Builder Configuration */}
+                    {/* Assistant server configuration */}
                     <Card>
                         <CardHeader>
                             <CardTitle className="text-base flex items-center gap-2">
                                 <Server className="h-4 w-4" />
-                                {t('AI Builder')}
+                                {t('Assistant Server')}
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
                             <div className="space-y-2">
-                                <Label htmlFor="builder_id">{t('Primary Builder')}</Label>
+                                <Label htmlFor="builder_id">{t('Primary Assistant Server')}</Label>
                                 <Select
                                     value={data.builder_id?.toString() ?? 'system_default'}
                                     onValueChange={(value) =>
@@ -546,7 +548,7 @@ export default function PlanForm({ plan, aiProviders, builders, domainSettings, 
                                     </SelectContent>
                                 </Select>
                                 <p className="text-xs text-muted-foreground">
-                                    {t('Select which builder service to use for this plan')}
+                                    {t('Select which assistant server to use for this plan')}
                                 </p>
                             </div>
                         </CardContent>
@@ -643,6 +645,33 @@ export default function PlanForm({ plan, aiProviders, builders, domainSettings, 
                                     />
                                 </div>
                             )}
+                        </CardContent>
+                    </Card>
+
+                    {/* PHP Runtime */}
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-base flex items-center gap-2">
+                                <Terminal className="h-4 w-4" />
+                                {t('PHP Runtime')}
+                            </CardTitle>
+                            <CardDescription>
+                                {t('Allow uploaded PHP projects to execute in preview and published URLs')}
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="flex items-center justify-between p-4 border rounded-lg">
+                                <div className="space-y-0.5">
+                                    <Label>{t('Enable PHP Runtime')}</Label>
+                                    <p className="text-sm text-muted-foreground">
+                                        {t('Uploaded projects with index.php can run PHP scripts')}
+                                    </p>
+                                </div>
+                                <Switch
+                                    checked={data.enable_php_runtime}
+                                    onCheckedChange={(checked) => setData('enable_php_runtime', checked)}
+                                />
+                            </div>
                         </CardContent>
                     </Card>
 

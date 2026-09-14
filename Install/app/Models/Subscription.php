@@ -160,7 +160,7 @@ class Subscription extends Model
     public function scopeAwaitingApproval($query)
     {
         return $query->where('status', self::STATUS_PENDING)
-            ->where('payment_method', self::PAYMENT_BANK_TRANSFER)
+            ->whereIn('payment_method', [self::PAYMENT_BANK_TRANSFER, self::PAYMENT_MANUAL])
             ->whereNull('approved_at');
     }
 
@@ -199,7 +199,7 @@ class Subscription extends Model
      */
     public function requiresApproval(): bool
     {
-        return $this->payment_method === self::PAYMENT_BANK_TRANSFER
+        return in_array($this->payment_method, [self::PAYMENT_BANK_TRANSFER, self::PAYMENT_MANUAL], true)
             && $this->status === self::STATUS_PENDING
             && $this->approved_at === null;
     }
@@ -360,13 +360,13 @@ class Subscription extends Model
     /**
      * Calculate next renewal date based on plan billing period.
      */
-    public function calculateNextRenewal(): \Carbon\Carbon
+    public function calculateNextRenewal(): ?\Carbon\Carbon
     {
         $billingPeriod = $this->plan->billing_period ?? 'monthly';
 
         return match ($billingPeriod) {
             'yearly' => now()->addYear(),
-            'lifetime' => now()->addYears(100), // Effectively never
+            'lifetime' => null,
             default => now()->addMonth(),
         };
     }

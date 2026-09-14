@@ -149,5 +149,9 @@
     "Warm, energetic": "Warm, energetic",
     "Elegant, creative": "Elegant, creative",
     "Minimal, professional": "Minimal, professional",
-    "Soft, playful": "Soft, playful"
+    "Soft, playful": "Soft, playful",
+    "Switch to another project without leaving the builder.": "Switch to another project without leaving the builder.",
+    "Could not load your projects.": "Could not load your projects.",
+    "Draft": "Draft",
+    "New project": "New project"
 }

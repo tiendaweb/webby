@@ -3,6 +3,7 @@ import { Link, router } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { GradientBackground } from '@/components/Dashboard/GradientBackground';
+import { cn } from '@/lib/utils';
 import { ArrowRight, ArrowLeft, AlertCircle } from 'lucide-react';
 import { useScramble } from 'use-scramble';
 import { TrustedBy } from './TrustedBy';
@@ -25,6 +26,7 @@ interface HeroSectionProps {
         subtitles?: string[];
         cta_button?: string;
     };
+    useAnimatedBackground?: boolean;
     trustedBy?: {
         enabled?: boolean;
         content?: Record<string, unknown>;
@@ -95,6 +97,7 @@ export function HeroSection({
     isPusherConfigured = true,
     canCreateProject = true,
     cannotCreateReason = null,
+    useAnimatedBackground = false,
     trustedBy,
 }: HeroSectionProps) {
     const { t, locale, isRtl } = useTranslation();
@@ -206,8 +209,13 @@ export function HeroSection({
     };
 
     return (
-        <section className="relative h-dvh flex flex-col items-center justify-center px-4 pt-16 pb-32 sm:pb-24 bg-background">
-            <GradientBackground />
+        <section
+            className={cn(
+                'relative h-dvh flex flex-col items-center justify-center px-4 pt-16 pb-32 sm:pb-24',
+                useAnimatedBackground ? 'bg-transparent' : 'bg-background'
+            )}
+        >
+            {!useAnimatedBackground && <GradientBackground />}
 
             <div className="relative z-10 w-full max-w-4xl mx-auto text-center px-2 sm:px-0">
                 {/* Headline with scramble animation */}

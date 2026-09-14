@@ -54,7 +54,7 @@ export function DemoResetNotice({ variant = 'user' }: DemoResetNoticeProps) {
                     </DialogTitle>
                     <DialogDescription className="text-center">
                         {isAdmin
-                            ? 'This admin panel is for demo viewing only. Settings are read-only and the environment resets every 3 hours. Register your own account to test the AI website builder.'
+                            ? 'This admin panel is for demo viewing only. Settings are read-only and the environment resets every 3 hours. Register your own account to test the hosting workspace.'
                             : 'This demo environment resets every 3 hours. Any projects or changes will be cleared automatically.'
                         }
                     </DialogDescription>

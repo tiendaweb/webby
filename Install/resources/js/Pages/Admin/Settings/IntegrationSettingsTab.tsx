@@ -1,5 +1,6 @@
 import { useForm } from '@inertiajs/react';
 import { FormEventHandler, useMemo, useState } from 'react';
+import axios from 'axios';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -25,7 +26,6 @@ import {
     DialogTrigger,
 } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import axios from 'axios';
 import type { IntegrationSettings, PusherCluster, BroadcastDriver, ReverbScheme, AiProvider } from './types';
 import { FirebaseAdminUpload } from '@/components/Admin/FirebaseAdminUpload';
 import { useTranslation } from '@/contexts/LanguageContext';
@@ -63,6 +63,16 @@ const RECOMMENDED_MODELS: Record<string, { value: string; label: string }[]> = {
     ],
     zhipu: [
         { value: 'glm-4.5-air', label: 'GLM-4.5 Air (Recommended)' },
+    ],
+    gemini: [
+        { value: 'gemini-3.1-flash-lite', label: 'Gemini 3.1 Flash-Lite (Recommended)' },
+        { value: 'gemini-3-flash-preview', label: 'Gemini 3 Flash Preview' },
+        { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
+    ],
+    nvidia: [
+        { value: 'nvidia/nemotron-3-nano-30b-a3b', label: 'Nemotron 3 Nano 30B (Recommended)' },
+        { value: 'qwen/qwen3-coder-480b-a35b-instruct', label: 'Qwen3 Coder 480B' },
+        { value: 'openai/gpt-oss-20b', label: 'GPT OSS 20B' },
     ],
 };
 
@@ -114,11 +124,25 @@ export default function IntegrationSettingsTab({ settings, aiProviders }: Props)
 
     const submit: FormEventHandler = (e) => {
         e.preventDefault();
-        put(route('admin.settings.integrations'), {
-            preserveScroll: true,
-            onSuccess: () => toast.success(t('Integration settings updated')),
-            onError: () => toast.error(t('Failed to update settings')),
+
+        // Filter out empty secret fields
+        const submitData = { ...data };
+        const secretFields = ['pusher_key', 'pusher_secret', 'reverb_key', 'reverb_secret', 'firebase_system_api_key'];
+        secretFields.forEach(field => {
+            if (!submitData[field as keyof typeof submitData]) {
+                delete submitData[field as keyof typeof submitData];
+            }
         });
+
+        axios.put(route('admin.settings.integrations'), submitData)
+            .then(() => {
+                toast.success(t('Integration settings updated'));
+                window.location.reload();
+            })
+            .catch((error) => {
+                toast.error(t('Failed to update settings'));
+                console.error(error);
+            });
     };
 
     const handleProviderChange = (value: string) => {

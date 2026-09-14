@@ -55,6 +55,7 @@ import {
     RefreshCw,
     Eye,
     EyeOff,
+    ExternalLink,
 } from 'lucide-react';
 import { User } from '@/types';
 import { AiProvider, AiProviderType } from '@/types/admin';
@@ -170,6 +171,14 @@ function ProviderForm({
                 </div>
                 {errors.api_key && (
                     <p className="text-sm text-destructive">{t(errors.api_key)}</p>
+                )}
+                {formData.type === 'nvidia' && (
+                    <Button asChild variant="outline" size="sm" className="mt-1 gap-2">
+                        <a href="https://build.nvidia.com" target="_blank" rel="noopener noreferrer">
+                            {t('Get NVIDIA API key')}
+                            <ExternalLink className="h-3.5 w-3.5" />
+                        </a>
+                    </Button>
                 )}
             </div>
 

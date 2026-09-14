@@ -43,7 +43,9 @@ import {
     Key,
     Loader2,
     Lock,
+    Plug,
     RefreshCw,
+    SearchCheck,
     Settings2,
     Sparkles,
     Trash2,
@@ -53,8 +55,11 @@ import { cn } from '@/lib/utils';
 import axios from 'axios';
 import { FirebaseConfig } from './FirebaseConfig';
 import { CustomDomainCard } from './CustomDomainCard';
+import { ProjectSeoPanel } from './ProjectSeoPanel';
+import { AiConnectorCard, type AiConnectorSettings } from './AiConnectorCard';
 import type { FirebaseConfig as FirebaseConfigType } from '@/types/storage';
 import { useTranslation } from '@/contexts/LanguageContext';
+import { buildPublishedUrl } from '@/lib/publishedUrl';
 
 interface SubdomainUsage {
     used: number;
@@ -123,12 +128,13 @@ interface ProjectSettingsPanelProps {
     suggestedSubdomain: string;
     firebase?: FirebaseSettings;
     storage?: StorageSettings;
+    aiConnector?: AiConnectorSettings | null;
     customDomain?: CustomDomainSettings;
     subdomainsGloballyEnabled?: boolean;
     customDomainsGloballyEnabled?: boolean;
 }
 
-type SettingsTab = 'general' | 'domains' | 'knowledge' | 'storage' | 'database';
+type SettingsTab = 'general' | 'seo' | 'domains' | 'knowledge' | 'storage' | 'database' | 'connector';
 export type AvailabilityStatus = 'idle' | 'checking' | 'available' | 'unavailable' | 'invalid';
 
 export function ProjectSettingsPanel({
@@ -141,6 +147,7 @@ export function ProjectSettingsPanel({
     suggestedSubdomain,
     firebase,
     storage,
+    aiConnector,
     customDomain,
     subdomainsGloballyEnabled = false,
     customDomainsGloballyEnabled = false,
@@ -151,6 +158,7 @@ export function ProjectSettingsPanel({
     const tabConfig = useMemo(() => {
         const tabs: Array<{ key: SettingsTab; labelKey: string; icon: typeof Settings2 }> = [
             { key: 'general', labelKey: 'General', icon: Settings2 },
+            { key: 'seo', labelKey: 'SEO', icon: SearchCheck },
         ];
 
         // Only show domains tab if at least one domain feature is globally enabled
@@ -161,11 +169,15 @@ export function ProjectSettingsPanel({
         tabs.push(
             { key: 'knowledge', labelKey: 'Knowledge', icon: Sparkles },
             { key: 'storage', labelKey: 'Storage', icon: HardDrive },
-            { key: 'database', labelKey: 'Database', icon: Database }
+            { key: 'database', labelKey: 'Data', icon: Database }
         );
 
+        if (aiConnector) {
+            tabs.push({ key: 'connector', labelKey: 'AI Connector', icon: Plug });
+        }
+
         return tabs;
-    }, [subdomainsGloballyEnabled, customDomainsGloballyEnabled]);
+    }, [subdomainsGloballyEnabled, customDomainsGloballyEnabled, aiConnector]);
 
     const [activeTab, setActiveTab] = useState<SettingsTab>('general');
 
@@ -199,6 +211,7 @@ export function ProjectSettingsPanel({
 
     const isPublished = project.subdomain !== null;
     const canPublish = canUseSubdomains && (isPublished || canCreateMoreSubdomains);
+    const publishedUrl = buildPublishedUrl(project.subdomain, baseDomain);
 
     // Debounced availability check
     const checkAvailability = useCallback(async (value: string) => {
@@ -246,6 +259,7 @@ export function ProjectSettingsPanel({
         setIsSavingGeneral(true);
 
         router.put(`/project/${project.id}/settings/general`, {
+            name: title,
             published_title: title,
             published_description: description,
             published_visibility: visibility,
@@ -267,6 +281,17 @@ export function ProjectSettingsPanel({
         setIsPublishing(true);
 
         try {
+            const audit = await axios.post(`/project/${project.id}/publish-audit`);
+            if ((audit.data?.summary?.errors ?? 0) > 0) {
+                toast.error(t('Fix publish audit errors before publishing'));
+                setIsPublishing(false);
+                return;
+            }
+
+            if ((audit.data?.summary?.warnings ?? 0) > 0) {
+                toast.warning(t('Publish audit has warnings'));
+            }
+
             const response = await axios.post(`/project/${project.id}/publish`, {
                 subdomain,
                 title: title || project.name,
@@ -529,6 +554,9 @@ export function ProjectSettingsPanel({
                     </form>
                 );
 
+            case 'seo':
+                return <ProjectSeoPanel projectId={project.id} />;
+
             case 'domains':
                 return (
                     <div className="space-y-6">
@@ -597,12 +625,12 @@ export function ProjectSettingsPanel({
                                                 <p className="text-sm text-muted-foreground">
                                                     {t('Your project is live at:')}{' '}
                                                     <a
-                                                        href={`https://${project.subdomain}.${baseDomain}`}
+                                                        href={publishedUrl || '#'}
                                                         target="_blank"
                                                         rel="noopener noreferrer"
                                                         className="text-primary hover:underline"
                                                     >
-                                                        {project.subdomain}.{baseDomain}
+                                                        {publishedUrl || `${project.subdomain}.${baseDomain}`}
                                                     </a>
                                                 </p>
                                             </div>
@@ -896,6 +924,11 @@ export function ProjectSettingsPanel({
             case 'database':
                 return (
                     <div className="space-y-6">
+                        {/* No per-project "Manage project data" link here on purpose — /database is an
+                            admin-only global SQL tool by design (see Install/docs/project-workspaces.md:
+                            "There is no per-project database tab"). Firebase is the only per-project
+                            data source; a card linking clients to /database used to live here and just
+                            404'd/403'd for them, so it was removed rather than restored. */}
                         {firebase ? (
                             <FirebaseConfig
                                 projectId={project.id}
@@ -933,6 +966,11 @@ export function ProjectSettingsPanel({
                         )}
                     </div>
                 );
+
+            case 'connector':
+                return aiConnector ? (
+                    <AiConnectorCard projectId={project.id} aiConnector={aiConnector} />
+                ) : null;
 
             default:
                 return null;

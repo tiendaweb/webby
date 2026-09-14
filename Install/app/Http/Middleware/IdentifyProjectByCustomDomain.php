@@ -5,6 +5,7 @@ namespace App\Http\Middleware;
 use App\Http\Controllers\PublishedProjectController;
 use App\Models\Project;
 use App\Models\SystemSetting;
+use App\Support\BaseDomainHelper;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -19,19 +20,11 @@ class IdentifyProjectByCustomDomain
         }
 
         $host = strtolower($request->getHost());
-        $baseDomain = SystemSetting::get('domain_base_domain');
+        $baseDomains = BaseDomainHelper::all();
 
-        // Skip if host is the base domain or a subdomain of it
-        if ($baseDomain) {
-            $baseDomain = strtolower($baseDomain);
-
-            // Skip if exact match with base domain
-            if ($host === $baseDomain || $host === "www.{$baseDomain}") {
-                return $next($request);
-            }
-
-            // Skip if it's a subdomain of the base domain
-            if (str_ends_with($host, ".{$baseDomain}")) {
+        // Skip if host is one of the base domains (primary or alias) or a subdomain of one
+        if (! empty($baseDomains)) {
+            if (BaseDomainHelper::match($host) !== null) {
                 return $next($request);
             }
         } else {

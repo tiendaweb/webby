@@ -43,6 +43,7 @@ class ProjectFileController extends Controller
             'is_audio' => $file->isAudio(),
             'source' => $file->source,
             'url' => $file->getUrl(),
+            'api_url' => $file->getApiUrl(),
             'created_at' => $file->created_at->toISOString(),
         ]);
 
@@ -103,6 +104,7 @@ class ProjectFileController extends Controller
                     'human_size' => $projectFile->getHumanReadableSize(),
                     'is_image' => $projectFile->isImage(),
                     'url' => $projectFile->getUrl(),
+                    'api_url' => $projectFile->getApiUrl(),
                     'created_at' => $projectFile->created_at->toISOString(),
                 ],
                 'storage_used' => $project->fresh()->storage_used_bytes,

@@ -5,12 +5,15 @@ import { Loader2 } from 'lucide-react';
 import { useTranslation } from '@/contexts/LanguageContext';
 import { THEME_PRESETS } from '@/lib/theme-presets';
 import { ThemePresetCard } from './ThemePresetCard';
+import { UsedColorEditor } from './UsedColorEditor';
 
 interface ThemeDesignerProps {
     currentTheme: string | null;
     onThemeSelect: (presetId: string) => void;
     onApply: (presetId: string) => Promise<void>;
     isSaving: boolean;
+    projectId?: string;
+    onColorsChanged?: () => void;
 }
 
 export function ThemeDesigner({
@@ -18,6 +21,8 @@ export function ThemeDesigner({
     onThemeSelect,
     onApply,
     isSaving,
+    projectId,
+    onColorsChanged,
 }: ThemeDesignerProps) {
     const { t } = useTranslation();
     const [selectedTheme, setSelectedTheme] = useState(currentTheme || 'default');
@@ -47,6 +52,9 @@ export function ThemeDesigner({
                         />
                     ))}
                 </div>
+                {projectId && (
+                    <UsedColorEditor projectId={projectId} onChanged={onColorsChanged} />
+                )}
             </ScrollArea>
 
             <div className="p-4 border-t flex items-center justify-between shrink-0">

@@ -64,7 +64,7 @@ class SocialLoginController extends Controller
         // Log the user in
         Auth::login($user, true);
 
-        return redirect()->intended(route('create'));
+        return redirect()->intended(route('projects.index'));
     }
 
     /**

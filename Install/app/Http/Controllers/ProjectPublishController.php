@@ -115,7 +115,7 @@ class ProjectPublishController extends Controller
         return response()->json([
             'success' => true,
             'project' => $project->fresh(),
-            'url' => $project->getPublishedUrl(),
+            'url' => $this->publishedUrl($request, $subdomain),
         ]);
     }
 
@@ -132,5 +132,28 @@ class ProjectPublishController extends Controller
         ]);
 
         return response()->json(['success' => true]);
+    }
+
+    private function publishedUrl(Request $request, string $subdomain): ?string
+    {
+        $baseDomain = SystemSetting::get('domain_base_domain', config('app.base_domain'));
+
+        if (! $baseDomain) {
+            return null;
+        }
+
+        $appUrl = config('app.url');
+        $scheme = parse_url($appUrl, PHP_URL_SCHEME) ?: $request->getScheme();
+        $appHost = parse_url($appUrl, PHP_URL_HOST) ?: $request->getHost();
+        $appPort = parse_url($appUrl, PHP_URL_PORT) ?: $request->getPort();
+        $isLocal = in_array($appHost, ['localhost', '127.0.0.1', '::1'], true)
+            || str_ends_with($appHost, '.lvh.me')
+            || str_ends_with($appHost, '.localhost');
+
+        $port = $isLocal && $appPort && ! in_array((int) $appPort, [80, 443], true)
+            ? ':'.$appPort
+            : '';
+
+        return "{$scheme}://{$subdomain}.{$baseDomain}{$port}";
     }
 }

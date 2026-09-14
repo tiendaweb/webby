@@ -73,6 +73,20 @@ return [
             'replace_placeholders' => true,
         ],
 
+        // Durable trace of every MCP tool call that carries elevated risk
+        // (currently: admin_database_query). See App\Services\Mcp\Tools\Admin\AdminDatabaseQueryTool.
+        // Deliberately NOT env('LOG_LEVEL', ...) — this audit trail must
+        // capture every call regardless of the app's general log verbosity
+        // (production runs LOG_LEVEL=error, which would otherwise silently
+        // drop every info-level entry here).
+        'mcp' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/mcp.log'),
+            'level' => 'debug',
+            'days' => 30,
+            'replace_placeholders' => true,
+        ],
+
         'slack' => [
             'driver' => 'slack',
             'url' => env('LOG_SLACK_WEBHOOK_URL'),

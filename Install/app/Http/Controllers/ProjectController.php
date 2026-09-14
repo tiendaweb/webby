@@ -5,14 +5,23 @@ namespace App\Http\Controllers;
 use App\Models\Project;
 use App\Models\SystemSetting;
 use App\Services\BroadcastService;
+use App\Services\TemplateClassifierService;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
+use App\Services\ProjectWorkspaceService;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class ProjectController extends Controller
 {
+    public function __construct(
+        protected TemplateClassifierService $templateClassifier
+    ) {}
+
     public function index(Request $request): Response
     {
         $user = $request->user();
@@ -47,8 +56,13 @@ class ProjectController extends Controller
             default => $query->orderBy('updated_at', 'desc'),
         };
 
+        $perPage = $this->perPage($request);
+
         // Paginate
-        $projects = $query->paginate(12)->withQueryString();
+        $projects = $query
+            ->paginate($perPage)
+            ->withQueryString()
+            ->through(fn (Project $project) => $this->projectPayload($project));
 
         $counts = [
             'all' => $user->projects()->count(),
@@ -60,6 +74,7 @@ class ProjectController extends Controller
             'search' => $search,
             'sort' => $sort,
             'visibility' => $visibility,
+            'per_page' => $perPage,
         ];
 
         return Inertia::render('Projects/Index', [
@@ -76,7 +91,7 @@ class ProjectController extends Controller
         // Block demo admin from creating projects — they should register their own account
         if (config('app.demo') && Auth::id() === 1) {
             return back()->withErrors([
-                'prompt' => 'The demo admin account cannot create projects. Register your own account to test the AI website builder.',
+                'prompt' => 'The demo admin account cannot create projects. Register your own account to test the hosting workspace.',
             ]);
         }
 
@@ -131,13 +146,36 @@ class ProjectController extends Controller
 
         // Generate a name from the prompt (first 50 chars)
         $name = str($validated['prompt'])->limit(50, '...')->toString();
+        $templateId = $validated['template_id'] ?? null;
+        $themePreset = $validated['theme_preset'] ?? null;
+
+        if ($templateId) {
+            $template = \App\Models\Template::find($templateId);
+            if ($template && ! $template->isAvailableForPlan($request->user()->getCurrentPlan())) {
+                return back()->withErrors([
+                    'prompt' => 'The selected template is not available for your plan.',
+                ]);
+            }
+        }
+
+        if (! $templateId) {
+            $recommendation = $this->templateClassifier->recommendTemplates(
+                $validated['prompt'],
+                $request->user()->getCurrentPlan(),
+                1
+            );
+
+            $templateId = $recommendation['templates'][0]['id'] ?? null;
+            $themePreset = $themePreset ?? $recommendation['theme_preset'] ?? null;
+        }
 
         $project = Project::create([
             'user_id' => $request->user()->id,
+            'type' => 'ai',
             'name' => $name,
             'initial_prompt' => $validated['prompt'],
-            'template_id' => $validated['template_id'] ?? null,
-            'theme_preset' => $validated['theme_preset'] ?? null,
+            'template_id' => $templateId,
+            'theme_preset' => $themePreset,
             'last_viewed_at' => now(),
         ]);
 
@@ -169,8 +207,13 @@ class ProjectController extends Controller
             default => $query->orderBy('deleted_at', 'desc'),
         };
 
+        $perPage = $this->perPage($request);
+
         // Paginate
-        $projects = $query->paginate(12)->withQueryString();
+        $projects = $query
+            ->paginate($perPage)
+            ->withQueryString()
+            ->through(fn (Project $project) => $this->projectPayload($project));
 
         $counts = [
             'all' => $user->projects()->count(),
@@ -182,6 +225,7 @@ class ProjectController extends Controller
             'search' => $search,
             'sort' => $sort,
             'visibility' => null, // Not applicable for trash
+            'per_page' => $perPage,
         ];
 
         return Inertia::render('Projects/Index', [
@@ -202,6 +246,24 @@ class ProjectController extends Controller
         return back();
     }
 
+    public function rename(Request $request, Project $project): RedirectResponse
+    {
+        $this->authorize('update', $project);
+
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+        ]);
+
+        $name = trim($validated['name']);
+
+        $project->update([
+            'name' => $name,
+            'published_title' => $name,
+        ]);
+
+        return back()->with('message', 'Project renamed successfully');
+    }
+
     public function duplicate(Project $project): RedirectResponse
     {
         $this->authorize('view', $project);
@@ -209,7 +271,7 @@ class ProjectController extends Controller
         // Block demo admin from duplicating projects
         if (config('app.demo') && Auth::id() === 1) {
             return back()->withErrors([
-                'project' => 'The demo admin account cannot create projects. Register your own account to test the AI website builder.',
+                'project' => 'The demo admin account cannot create projects. Register your own account to test the hosting workspace.',
             ]);
         }
 
@@ -240,6 +302,47 @@ class ProjectController extends Controller
         return back()->with('message', 'Project moved to trash');
     }
 
+    /**
+     * Descarga el proyecto entero como zip.
+     *
+     * La ruta va firmada y caduca: el enlace se genera desde una herramienta
+     * de conector, viaja por una conversación y no debería seguir sirviendo
+     * el sitio de un cliente una semana después. La firma incluye el id, así
+     * que un enlace no vale para otro proyecto.
+     *
+     * El zip se arma en el momento y se borra al terminar el envío. Guardarlo
+     * dejaría copias completas de cada sitio acumulándose en disco, que es
+     * justo lo que uno no quiere de una función pensada para usarse seguido.
+     */
+    public function export(Request $request, Project $project, ProjectWorkspaceService $workspace)
+    {
+        // La firma prueba que el enlace lo emitió la plataforma, no quién lo
+        // está abriendo. Un enlace reenviado por error a otra pestaña abierta
+        // no debería entregar el sitio de un cliente, así que además de la
+        // firma se exige ser el dueño (o un administrador).
+        $user = $request->user();
+
+        if (! $user || (! $user->isAdmin() && ! $user->can('view', $project))) {
+            abort(403, 'This export link is not for your account.');
+        }
+
+        $temporal = tempnam(sys_get_temp_dir(), 'webby-export-');
+
+        try {
+            $workspace->exportZip($project, $temporal);
+        } catch (\Throwable $e) {
+            @unlink($temporal);
+
+            abort(422, $e->getMessage());
+        }
+
+        $nombre = Str::slug($project->name ?: 'proyecto').'-'.now()->format('Ymd-His').'.zip';
+
+        return response()->download($temporal, $nombre, [
+            'Content-Type' => 'application/zip',
+        ])->deleteFileAfterSend(true);
+    }
+
     public function restore(Project $project): RedirectResponse
     {
         $this->authorize('restore', $project);
@@ -257,5 +360,52 @@ class ProjectController extends Controller
         $project->forceDelete();
 
         return back()->with('message', 'Project permanently deleted');
+    }
+
+    private function perPage(Request $request): int
+    {
+        $perPage = (int) $request->get('per_page', 12);
+
+        return in_array($perPage, [12, 24, 48], true) ? $perPage : 12;
+    }
+
+    /**
+     * Lista plana de los proyectos del usuario para el selector rápido.
+     *
+     * Devuelve JSON y no una página de Inertia porque quien la pide ya está
+     * dentro de un proyecto: cambiar de uno a otro no debería costar una
+     * recarga entera de /projects, que es lo que pasaba cuando el botón de
+     * inicio era un enlace.
+     *
+     * Sin paginar a propósito: son unas pocas decenas por usuario y el modal
+     * filtra en el navegador, así que buscar no pega otra vuelta al servidor.
+     */
+    public function switcher(Request $request): JsonResponse
+    {
+        $projects = $request->user()->projects()
+            ->orderByDesc('updated_at')
+            ->get(['id', 'name', 'type', 'thumbnail', 'subdomain', 'is_starred', 'published_at', 'updated_at'])
+            ->map(fn (Project $project) => [
+                'id' => $project->id,
+                'name' => $project->name,
+                'type' => $project->type,
+                'thumbnail' => $project->thumbnail,
+                'subdomain' => $project->subdomain,
+                'is_starred' => (bool) $project->is_starred,
+                'is_published' => $project->published_at !== null,
+                'updated_at' => $project->updated_at?->toIso8601String(),
+            ]);
+
+        return response()->json(['projects' => $projects]);
+    }
+
+    private function projectPayload(Project $project): array
+    {
+        $payload = $project->toArray();
+        $payload['preview_url'] = Storage::disk('local')->exists("previews/{$project->id}")
+            ? "/preview/{$project->id}/"
+            : null;
+
+        return $payload;
     }
 }

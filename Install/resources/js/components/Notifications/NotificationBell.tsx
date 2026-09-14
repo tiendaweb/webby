@@ -21,6 +21,7 @@ interface NotificationBellProps {
     onMarkAsRead: (id: number) => void;
     onMarkAllAsRead: () => void;
     isLoading?: boolean;
+    align?: 'start' | 'end';
 }
 
 interface Position {
@@ -68,6 +69,7 @@ export function NotificationBell({
     onMarkAsRead,
     onMarkAllAsRead,
     isLoading = false,
+    align,
 }: NotificationBellProps) {
     const { t, isRtl } = useTranslation();
     const [open, setOpen] = useState(false);
@@ -82,13 +84,19 @@ export function NotificationBell({
         const rect = button.getBoundingClientRect();
 
         if (!open) {
+            const left = align === 'start'
+                ? rect.left
+                : align === 'end'
+                    ? rect.right - menuWidth
+                    : isRtl ? rect.left : rect.right - menuWidth;
+
             setPosition({
                 top: rect.bottom + 4,
-                left: isRtl ? rect.left : rect.right - menuWidth,
+                left,
             });
         }
         setOpen(!open);
-    }, [open, isRtl, menuWidth]);
+    }, [align, open, isRtl, menuWidth]);
 
     // Close on click outside, escape, and scroll
     useEffect(() => {

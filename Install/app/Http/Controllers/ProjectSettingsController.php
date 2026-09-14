@@ -2,13 +2,17 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AiConnectorModule;
 use App\Models\Builder;
 use App\Models\Project;
+use App\Models\ProjectAiConnectorActivation;
+use App\Models\ProjectAiConnectorToken;
 use App\Models\SystemSetting;
 use App\Services\BuilderService;
 use App\Services\DomainSettingService;
 use App\Services\FirebaseAdminService;
 use App\Services\FirebaseService;
+use App\Services\ProjectRevisionService;
 use App\Support\SubdomainHelper;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -22,7 +26,8 @@ class ProjectSettingsController extends Controller
     public function __construct(
         protected FirebaseService $firebaseService,
         protected FirebaseAdminService $firebaseAdminService,
-        protected DomainSettingService $domainSettingService
+        protected DomainSettingService $domainSettingService,
+        protected ProjectRevisionService $revisionService
     ) {}
 
     public function show(Request $request, Project $project): Response
@@ -59,6 +64,47 @@ class ProjectSettingsController extends Controller
             ];
         }
 
+        // AI Connector (MCP) module settings
+        $aiConnectorModule = AiConnectorModule::where('slug', AiConnectorModule::SLUG_AI_CONNECTOR)
+            ->where('is_active', true)
+            ->first();
+        $aiConnectorActivation = $aiConnectorModule
+            ? ProjectAiConnectorActivation::where('project_id', $project->id)
+                ->where('ai_connector_module_id', $aiConnectorModule->id)
+                ->first()
+            : null;
+        $aiConnectorSettings = $aiConnectorModule ? [
+            'module' => [
+                'id' => $aiConnectorModule->id,
+                'name' => $aiConnectorModule->name,
+                'description' => $aiConnectorModule->description,
+                'pricing_type' => $aiConnectorModule->pricing_type,
+                'price' => (float) $aiConnectorModule->price,
+            ],
+            'activation' => $aiConnectorActivation ? [
+                'id' => $aiConnectorActivation->id,
+                'status' => $aiConnectorActivation->status,
+                'is_active' => $aiConnectorActivation->isActive(),
+                'payment_method' => $aiConnectorActivation->payment_method,
+                'renewal_at' => $aiConnectorActivation->renewal_at?->toIso8601String(),
+                'requires_approval' => $aiConnectorActivation->requiresApproval(),
+                'instructions' => $aiConnectorActivation->metadata['instructions'] ?? null,
+                'reference' => $aiConnectorActivation->external_subscription_id,
+            ] : null,
+            'tokens' => $aiConnectorActivation
+                ? $aiConnectorActivation->tokens()->whereNull('revoked_at')->get()->map(fn (ProjectAiConnectorToken $t) => [
+                    'id' => $t->id,
+                    'name' => $t->name,
+                    'last_four' => $t->token_last_four,
+                    'last_used_at' => $t->last_used_at?->toIso8601String(),
+                    'expires_at' => $t->expires_at?->toIso8601String(),
+                ])->values()
+                : [],
+            'mcpEndpoint' => $aiConnectorActivation && $aiConnectorActivation->isActive()
+                ? url("/api/mcp/project/{$project->id}")
+                : null,
+        ] : null;
+
         // Custom domain settings
         $customDomainSettings = null;
         if ($this->domainSettingService->isCustomDomainsEnabled()) {
@@ -93,6 +139,7 @@ class ProjectSettingsController extends Controller
             'suggestedSubdomain' => $project->subdomain ?? SubdomainHelper::generateFromString($project->name),
             'firebase' => $firebaseSettings,
             'storage' => $storageSettings,
+            'aiConnector' => $aiConnectorSettings,
             'customDomain' => $customDomainSettings,
             'subdomainsGloballyEnabled' => $this->domainSettingService->isSubdomainsEnabled(),
             'customDomainsGloballyEnabled' => $this->domainSettingService->isCustomDomainsEnabled(),
@@ -104,6 +151,7 @@ class ProjectSettingsController extends Controller
         $this->authorize('update', $project);
 
         $validated = $request->validate([
+            'name' => 'nullable|string|max:255',
             'published_title' => 'nullable|string|max:255',
             'published_description' => 'nullable|string|max:150',
             'published_visibility' => 'required|in:public,private',
@@ -113,7 +161,15 @@ class ProjectSettingsController extends Controller
             return back()->withErrors(['published_visibility' => 'Your plan does not include private visibility.']);
         }
 
-        $project->update($validated);
+        $title = trim((string) ($validated['published_title'] ?? ''));
+        $name = trim((string) ($validated['name'] ?? $title));
+
+        $project->update([
+            'name' => $name !== '' ? $name : $project->name,
+            'published_title' => $title !== '' ? $title : null,
+            'published_description' => $validated['published_description'],
+            'published_visibility' => $validated['published_visibility'],
+        ]);
 
         return back()->with('success', 'Settings updated.');
     }
@@ -249,6 +305,10 @@ class ProjectSettingsController extends Controller
 
         $validated = $request->validate([
             'theme_preset' => 'required|string|in:default,arctic,summer,fragrant,slate,feminine,forest,midnight,coral,mocha,ocean,ruby',
+        ]);
+
+        $this->revisionService->create($project, $request->user(), 'theme', 'Antes de aplicar tema', [
+            'theme_preset' => $validated['theme_preset'],
         ]);
 
         // 1. Save preference to database

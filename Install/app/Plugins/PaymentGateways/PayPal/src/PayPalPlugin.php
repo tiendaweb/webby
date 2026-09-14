@@ -261,13 +261,13 @@ class PayPalPlugin implements PaymentGatewayPlugin
     public function callback(Request $request): RedirectResponse
     {
         if ($request->has('cancelled')) {
-            return redirect()->route('create')
+            return redirect()->route('projects.index')
                 ->with('error', 'Payment was cancelled');
         }
 
-        // Simply redirect to create page - webhook will handle subscription activation
+        // Redirect to the projects home - webhook will handle subscription activation
         // This is more reliable as webhooks are guaranteed to be processed
-        return redirect()->route('create')
+        return redirect()->route('projects.index')
             ->with('info', 'Processing your subscription. You will receive a confirmation shortly.');
     }
 
@@ -627,13 +627,13 @@ class PayPalPlugin implements PaymentGatewayPlugin
         };
     }
 
-    private function calculateRenewalDate(Plan $plan): \Carbon\Carbon
+    private function calculateRenewalDate(Plan $plan): ?\Carbon\Carbon
     {
         $billingPeriod = $plan->billing_period ?? 'monthly';
 
         return match ($billingPeriod) {
             'yearly' => now()->addYear(),
-            'lifetime' => now()->addYears(100),
+            'lifetime' => null,
             default => now()->addMonth(),
         };
     }

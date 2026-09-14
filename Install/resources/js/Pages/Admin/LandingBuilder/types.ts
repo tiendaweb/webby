@@ -38,6 +38,7 @@ export interface SectionSettings {
 
 export interface Section {
     id: number;
+    landing_page_id: number;
     type: string;
     sort_order: number;
     is_enabled: boolean;
@@ -46,11 +47,30 @@ export interface Section {
     items: Record<string, SectionItem[]>;
 }
 
+export interface LandingPageData {
+    id: number;
+    name: string;
+    slug: string;
+    type: 'sections' | 'html_code';
+    is_home: boolean;
+    is_active: boolean;
+    meta_title: string | null;
+    meta_description: string | null;
+    settings: Record<string, unknown> | null;
+    sections_count?: number;
+    created_at?: string;
+    updated_at?: string;
+}
+
 export interface LandingBuilderProps {
+    pages: LandingPageData[];
+    currentPage: LandingPageData | null;
     sections: Section[];
     sectionTypes: Record<string, SectionType>;
+    presets: Record<string, { label: string; description: string }>;
     languages: Language[];
     defaultLanguage: string;
+    htmlCode: string | null;
 }
 
 export interface LandingBuilderState {

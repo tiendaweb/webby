@@ -16,7 +16,9 @@ use App\Observers\ProjectObserver;
 use App\Observers\SubscriptionObserver;
 use App\Observers\TransactionObserver;
 use App\Observers\UserObserver;
+use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Vite;
 use Illuminate\Support\ServiceProvider;
@@ -48,6 +50,8 @@ class AppServiceProvider extends ServiceProvider
         Transaction::observe(TransactionObserver::class);
         User::observe(UserObserver::class);
 
+        $this->configureMcpRateLimiters();
+
         // Register event listeners
         Event::listen(BuilderCompleteEvent::class, TrackBuildCreditUsage::class);
         Event::listen(BuilderCompleteEvent::class, [SyncProjectBuildStatus::class, 'handleComplete']);
@@ -72,6 +76,28 @@ class AppServiceProvider extends ServiceProvider
     }
 
     /**
+     * Named rate limiters for the MCP connector endpoints, keyed by the
+     * authenticated token/project rather than by IP, so multiple legitimate
+     * MCP clients behind a shared IP aren't penalized together.
+     */
+    protected function configureMcpRateLimiters(): void
+    {
+        RateLimiter::for('mcp-admin', function ($request) {
+            $token = $request->user()?->currentAccessToken();
+            $key = $token?->id ?? $request->ip();
+
+            return Limit::perMinute(120)->by("mcp-admin:{$key}");
+        });
+
+        RateLimiter::for('mcp-project', function ($request) {
+            $token = $request->attributes->get('connector_token');
+            $key = $token?->id ?? $request->route('project') ?? $request->ip();
+
+            return Limit::perMinute(60)->by("mcp-project:{$key}");
+        });
+    }
+
+    /**
      * Apply dynamic session timeout from settings.
      */
     protected function configureSessionTimeout(): void
@@ -93,18 +119,14 @@ class AppServiceProvider extends ServiceProvider
     {
         try {
             if (SystemSetting::get('domain_enable_subdomains', false)) {
-                $baseDomain = SystemSetting::get('domain_base_domain', '');
-                if (! empty($baseDomain)) {
-                    $domain = ltrim($baseDomain, '.');
+                // Only set the wildcard session domain when the request host
+                // actually matches one of the base domains. Otherwise the
+                // browser scopes the cookie to a domain that doesn't
+                // match the current host, causing 419 CSRF errors.
+                $domain = \App\Support\BaseDomainHelper::match(request()->getHost());
 
-                    // Only set the wildcard session domain when the request
-                    // host actually matches the base domain. Otherwise the
-                    // browser scopes the cookie to a domain that doesn't
-                    // match the current host, causing 419 CSRF errors.
-                    $host = request()->getHost();
-                    if ($host === $domain || str_ends_with($host, ".{$domain}")) {
-                        config(['session.domain' => ".{$domain}"]);
-                    }
+                if ($domain !== null) {
+                    config(['session.domain' => ".{$domain}"]);
                 }
             }
         } catch (\Exception $e) {

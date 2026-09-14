@@ -15,7 +15,7 @@ import {
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { AppSidebar } from '@/components/Sidebar/AppSidebar';
-import { GradientBackground } from '@/components/Dashboard/GradientBackground';
+import { AnimatedBackground } from '@/components/Landing/AnimatedBackground';
 import { PromptInput } from '@/components/Dashboard/PromptInput';
 import { ChatPageSkeleton } from '@/components/Skeleton';
 import { ThemeToggle } from '@/components/ThemeToggle';
@@ -35,9 +35,11 @@ import axios from 'axios';
 
 export default function Create({
     user,
-    isPusherConfigured,
     canCreateProject,
     cannotCreateReason,
+    canUseAiAssistant,
+    cannotUseAiReason,
+    codeCanvasAvailable,
     suggestions: initialSuggestions,
     typingPrompts: initialTypingPrompts,
     greeting: initialGreeting,
@@ -68,6 +70,9 @@ export default function Create({
 
     // Credits state
     const [credits, setCredits] = useState<UserCredits | null>(userCredits);
+    const [isSavingCodeProject, setIsSavingCodeProject] = useState(false);
+    const [isSavingTemplateProject, setIsSavingTemplateProject] = useState(false);
+    const [submittingTemplateId, setSubmittingTemplateId] = useState<number | null>(null);
 
     // Subscribe to user channel for real-time updates
     useUserChannel({
@@ -171,6 +176,41 @@ export default function Create({
         });
     };
 
+    const handleTemplateSubmit = async (templateId: number) => {
+        setIsSavingTemplateProject(true);
+        setSubmittingTemplateId(templateId);
+
+        try {
+            const response = await axios.post('/api/blank-project/from-template', { template_id: templateId });
+            router.visit(response.data.redirect_url);
+        } catch (error) {
+            const err = error as { response?: { data?: { error?: string } } };
+            toast.error(err.response?.data?.error || t('Error al crear el proyecto desde la plantilla.'));
+        } finally {
+            setIsSavingTemplateProject(false);
+            setSubmittingTemplateId(null);
+        }
+    };
+
+    const handleCodeSubmit = async (html: string, name: string | null) => {
+        setIsSavingCodeProject(true);
+
+        try {
+            const response = await axios.post('/api/blank-project/code', {
+                name,
+                html,
+            });
+
+            toast.success(response.data.message || t('HTML project saved and published.'));
+            router.visit(response.data.redirect_url || `/project/${response.data.project.id}`);
+        } catch (error) {
+            const err = error as { response?: { data?: { error?: string; message?: string } } };
+            toast.error(err.response?.data?.error || err.response?.data?.message || t('Failed to save HTML project'));
+        } finally {
+            setIsSavingCodeProject(false);
+        }
+    };
+
     return (
         <>
             <Head title={t("Create")} />
@@ -182,7 +222,7 @@ export default function Create({
                     <AppSidebar user={user} />
                     <SidebarInset className="bg-transparent">
                         <div className="relative min-h-screen bg-background">
-                            <GradientBackground />
+                            <AnimatedBackground />
 
                             {/* Header with sidebar trigger and user profile */}
                             <header className="sticky top-0 z-50 flex h-[60px] items-center justify-between px-4">
@@ -234,7 +274,7 @@ export default function Create({
                             </header>
 
                             {/* Hero Section - Full viewport height */}
-                            <div className="relative flex flex-col items-center justify-center min-h-[calc(100vh-4rem)] px-4 md:px-8">
+                            <div className="relative z-10 flex flex-col items-center justify-center min-h-[calc(100vh-4rem)] px-4 md:px-8">
                                 {/* Greeting with scramble animation */}
                                 <div className="prose prose-lg dark:prose-invert text-center mb-8">
                                     <h1
@@ -243,18 +283,8 @@ export default function Create({
                                     />
                                 </div>
 
-                                {/* Real-time not configured warning */}
-                                {!isPusherConfigured && (
-                                    <Alert variant="destructive" className="w-full max-w-3xl mb-4">
-                                        <AlertCircle className="h-4 w-4" />
-                                        <AlertDescription>
-                                            {t('Real-time features are not configured. Please configure broadcast settings in Admin Settings → Integrations.')}
-                                        </AlertDescription>
-                                    </Alert>
-                                )}
-
                                 {/* Cannot create project warning */}
-                                {!canCreateProject && isPusherConfigured && (
+                                {!canCreateProject && (
                                     <Alert variant="destructive" className="w-full max-w-3xl mb-4">
                                         <AlertCircle className="h-4 w-4" />
                                         <AlertDescription>
@@ -271,11 +301,28 @@ export default function Create({
                                     </Alert>
                                 )}
 
+                                {/* Optional assistant warning */}
+                                {canCreateProject && !canUseAiAssistant && (
+                                    <Alert className="w-full max-w-3xl mb-4">
+                                        <AlertCircle className="h-4 w-4" />
+                                        <AlertDescription>
+                                            {cannotUseAiReason || t('The AI assistant is unavailable. You can still create a site from code or templates.')}
+                                        </AlertDescription>
+                                    </Alert>
+                                )}
+
                                 {/* Prompt Input */}
                                 <div className="w-full max-w-3xl">
                                     <PromptInput
                                         onSubmit={handlePromptSubmit}
-                                        disabled={!isPusherConfigured || !canCreateProject}
+                                        onCodeSubmit={handleCodeSubmit}
+                                        onTemplateSubmit={handleTemplateSubmit}
+                                        disabled={!canUseAiAssistant}
+                                        creationDisabled={!canCreateProject}
+                                        codeCanvasAvailable={codeCanvasAvailable}
+                                        isCodeSubmitting={isSavingCodeProject}
+                                        isTemplateSubmitting={isSavingTemplateProject}
+                                        submittingTemplateId={submittingTemplateId}
                                         suggestions={suggestions}
                                         typingPrompts={typingPrompts}
                                         isLoadingSuggestions={isLoadingAi}

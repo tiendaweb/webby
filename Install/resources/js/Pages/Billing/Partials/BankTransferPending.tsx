@@ -48,6 +48,7 @@ export default function BankTransferPending({ subscription }: BankTransferPendin
 
     // Get instructions from subscription metadata
     const instructions = subscription.metadata?.instructions as string | undefined;
+    const isManual = subscription.payment_method === 'manual';
 
     return (
         <Card>
@@ -59,7 +60,9 @@ export default function BankTransferPending({ subscription }: BankTransferPendin
                             {t('Payment Pending')}
                         </CardTitle>
                         <CardDescription>
-                            {t('Complete your bank transfer to activate your subscription')}
+                            {isManual
+                                ? t('Your purchase is awaiting manual confirmation')
+                                : t('Complete your bank transfer to activate your subscription')}
                         </CardDescription>
                     </div>
                     <StatusBadge status="pending" />
@@ -72,7 +75,9 @@ export default function BankTransferPending({ subscription }: BankTransferPendin
                     <div className="text-sm">
                         <p className="font-medium">{t('Action Required')}</p>
                         <p className="text-muted-foreground">
-                            {t('Your subscription is pending until we receive and verify your bank transfer.')}
+                            {isManual
+                                ? t('An administrator will verify the payment and then activate your plan and AI credits.')
+                                : t('Your subscription is pending until we receive and verify your bank transfer.')}
                         </p>
                     </div>
                 </div>
@@ -97,8 +102,12 @@ export default function BankTransferPending({ subscription }: BankTransferPendin
                     <div className="space-y-1">
                         <p className="text-sm text-muted-foreground">{t('Payment Method')}</p>
                         <div className="flex items-center gap-2">
-                            <Banknote className="h-4 w-4 text-muted-foreground" />
-                            <span className="font-medium">{t('Bank Transfer')}</span>
+                            {isManual ? (
+                                <Clock className="h-4 w-4 text-muted-foreground" />
+                            ) : (
+                                <Banknote className="h-4 w-4 text-muted-foreground" />
+                            )}
+                            <span className="font-medium">{isManual ? t('Manual') : t('Bank Transfer')}</span>
                         </div>
                     </div>
 
@@ -126,7 +135,7 @@ export default function BankTransferPending({ subscription }: BankTransferPendin
                 </div>
 
                 {/* Bank Transfer Instructions */}
-                {instructions && (
+                {!isManual && instructions && (
                     <div className="mt-6 pt-6 border-t border-border">
                         <div className="flex items-center justify-between mb-4">
                             <div className="flex items-center gap-2">

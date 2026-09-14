@@ -17,7 +17,7 @@ export interface GeneralSettings {
     landing_page_enabled: boolean;
     default_currency: string;
     sentry_enabled: boolean;
-    purchase_code_configured: boolean;
+    // DESHABILITADO: purchase_code_configured: boolean;
 }
 
 export interface PlansSettings {
@@ -64,6 +64,7 @@ export interface EmailSettings {
     smtp_host: string;
     smtp_port: number;
     smtp_username: string;
+    smtp_password?: string;
     smtp_has_password: boolean;
     smtp_encryption: MailEncryption;
     mail_from_address: string;

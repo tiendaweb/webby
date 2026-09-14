@@ -3,11 +3,13 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class LandingSection extends Model
 {
     protected $fillable = [
+        'landing_page_id',
         'type',
         'sort_order',
         'is_enabled',
@@ -20,6 +22,11 @@ class LandingSection extends Model
     ];
 
     // Relationships
+    public function landingPage(): BelongsTo
+    {
+        return $this->belongsTo(LandingPage::class, 'landing_page_id');
+    }
+
     public function contents(): HasMany
     {
         return $this->hasMany(LandingContent::class, 'section_id');
@@ -42,10 +49,11 @@ class LandingSection extends Model
     }
 
     /**
-     * Get content for a specific locale with fallback to English.
+     * Get content for a specific locale with fallback to configured app locale.
      */
-    public function getContentForLocale(string $locale, string $fallback = 'en'): array
+    public function getContentForLocale(string $locale, ?string $fallback = null): array
     {
+        $fallback = $fallback ?? config('app.fallback_locale', config('app.locale', 'es'));
         $contents = $this->contents()
             ->whereIn('locale', [$locale, $fallback])
             ->get()
@@ -67,10 +75,11 @@ class LandingSection extends Model
     }
 
     /**
-     * Get items for a specific locale with fallback to English.
+     * Get items for a specific locale with fallback to configured app locale.
      */
-    public function getItemsForLocale(string $locale, string $fallback = 'en'): array
+    public function getItemsForLocale(string $locale, ?string $fallback = null): array
     {
+        $fallback = $fallback ?? config('app.fallback_locale', config('app.locale', 'es'));
         $items = $this->items()
             ->where('locale', $locale)
             ->where('is_enabled', true)
@@ -190,6 +199,13 @@ class LandingSection extends Model
                 'description' => __('Secondary CTA section'),
                 'has_items' => false,
                 'content_fields' => ['title', 'subtitle', 'button_text', 'button_url'],
+            ],
+            'html_block' => [
+                'name' => __('HTML Block'),
+                'icon' => 'Code2',
+                'description' => __('Custom HTML content block'),
+                'has_items' => false,
+                'content_fields' => ['html_code'],
             ],
         ];
     }

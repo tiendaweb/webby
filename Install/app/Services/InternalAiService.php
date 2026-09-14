@@ -24,60 +24,62 @@ class InternalAiService
         AiProvider::TYPE_GROK => 'grok-4-1-fast-non-reasoning',
         AiProvider::TYPE_DEEPSEEK => 'deepseek-chat',
         AiProvider::TYPE_ZHIPU => 'glm-4.5-air',
+        AiProvider::TYPE_GEMINI => 'gemini-3.1-flash-lite',
+        AiProvider::TYPE_NVIDIA => 'nvidia/nemotron-3-nano-30b-a3b',
     ];
 
     /**
      * Static fallback suggestions.
      */
     public const STATIC_SUGGESTIONS = [
-        'Build a task management app',
-        'Create a portfolio website',
-        'Design a landing page',
-        'Make an e-commerce store',
+        'Host a portfolio website',
+        'Import an existing landing page',
+        'Publish a PHP contact site',
+        'Edit a React marketing site',
     ];
 
     /**
      * Static fallback typing prompts.
      */
     public const STATIC_TYPING_PROMPTS = [
-        'Build me a modern portfolio website with dark mode...',
-        'Create a task management app with drag and drop...',
-        'Design a landing page for my SaaS startup...',
-        'Make an e-commerce store with cart functionality...',
-        'Build a blog platform with markdown support...',
-        'Create a dashboard for tracking analytics...',
-        'Design a booking system for appointments...',
-        'Build a social media feed with infinite scroll...',
+        'Upload and host my portfolio website...',
+        'Import this landing page and make it responsive...',
+        'Create a static site from this HTML...',
+        'Publish a PHP contact page with clean styling...',
+        'Edit the existing homepage copy and colors...',
+        'Turn this Vite app into a hosted site...',
+        'Prepare a product page for publishing...',
+        'Review this project before publishing...',
     ];
 
     /**
      * Static fallback greetings.
      */
     public const STATIC_GREETINGS = [
-        'What do you want to build, {name}?',
-        'What should we build, {name}?',
-        'What would you like to create, {name}?',
-        'What can I help you build, {name}?',
+        'What site do you want to host, {name}?',
+        'What should we publish, {name}?',
+        'What would you like to edit, {name}?',
+        'What site can I help you manage, {name}?',
     ];
 
     /**
      * Static fallback hero headlines for landing page.
      */
     public const STATIC_HERO_HEADLINES = [
-        'What will you build today?',
-        'What will you create today?',
-        'Build something amazing today',
-        'Turn your ideas into reality',
+        'Host and edit your sites in one place',
+        'Publish your website workspace today',
+        'Live editing for hosted websites',
+        'Bring existing sites under control',
     ];
 
     /**
      * Static fallback hero subtitles for landing page.
      */
     public const STATIC_HERO_SUBTITLES = [
-        'Create stunning websites by chatting with AI.',
-        'Turn your ideas into websites with AI.',
-        'Build beautiful websites through conversation.',
-        'Describe your vision and watch it come to life.',
+        'Import, edit, preview, and publish static or PHP sites.',
+        'Use the visual editor, code editor, and optional AI assistant together.',
+        'Manage hosted files, domains, previews, and revisions from one workspace.',
+        'Edit existing code live and publish when it is ready.',
     ];
 
     /**
@@ -261,6 +263,10 @@ class InternalAiService
     protected function generateSuggestions(int $count, ?string $locale = null): array
     {
         $provider = $this->getProvider();
+        if (! $provider) {
+            return [];
+        }
+
         $model = $this->getModel();
 
         $prompt = $this->buildSuggestionsPrompt($count, $locale);
@@ -282,20 +288,19 @@ class InternalAiService
         $languageInstruction = $this->getLanguageInstruction($locale);
 
         return <<<PROMPT
-Generate exactly {$count} short, creative web project ideas for an AI website builder.
+Generate exactly {$count} short, practical web hosting or website editing project ideas.
 
-Users will describe these to an AI that generates the complete website code.
-NO drag-and-drop, NO visual editors - just conversational building.
+Users may import files, edit existing code, preview changes, publish to hosting, and optionally ask an AI assistant for code edits.
 
 Each idea should be:
 - Concise (5-8 words max)
-- Start with action verb (Build, Create, Design, Make)
-- Varied (apps, sites, dashboards, landing pages, portfolios, etc.)
-- Realistic projects that can be built via chat with AI
+- Start with action verb (Host, Import, Edit, Publish, Update)
+- Varied (sites, landing pages, portfolios, PHP pages, frontend apps, etc.)
+- Realistic projects that can be hosted or edited in a website workspace
 {$languageInstruction}
 
 Return ONLY a JSON array of strings, nothing else. Example:
-["Build a habit tracker app", "Create a recipe sharing site", "Design a fitness dashboard", "Make a weather widget"]
+["Host a portfolio website", "Import a landing page", "Edit a product site", "Publish a PHP contact page"]
 PROMPT;
     }
 
@@ -330,17 +335,49 @@ PROMPT;
     }
 
     /**
+     * Generate an HTML section block from a natural-language prompt.
+     */
+    public function generateHtmlBlock(string $prompt, string $locale = 'en'): ?string
+    {
+        $provider = $this->getProvider();
+        if (! $provider) {
+            return null;
+        }
+
+        $model = $this->getModel();
+        $langInstruction = $this->getLanguageInstruction($locale);
+
+        $fullPrompt = <<<PROMPT
+Generate a complete HTML section for a landing page based on the following request:
+
+{$prompt}
+
+Rules:
+- Return ONLY the HTML code, no explanation, no markdown fences
+- Use a <style> block or inline styles for all CSS — no external stylesheets
+- The section must be fully responsive and look professional
+- Do NOT include <html>, <head>, or <body> tags — only the section content
+- Start directly with the outermost HTML element
+{$langInstruction}
+PROMPT;
+
+        return $this->callProvider($provider, $model, $fullPrompt, 4000, 60);
+    }
+
+    /**
      * Call the appropriate AI provider API.
      */
-    protected function callProvider(AiProvider $provider, string $model, string $prompt): ?string
+    protected function callProvider(AiProvider $provider, string $model, string $prompt, int $maxTokens = 300, int $timeout = 15): ?string
     {
         return match ($provider->type) {
             AiProvider::TYPE_OPENAI,
             AiProvider::TYPE_GROK,
-            AiProvider::TYPE_DEEPSEEK => $this->callOpenAiCompatible($provider, $model, $prompt),
+            AiProvider::TYPE_DEEPSEEK,
+            AiProvider::TYPE_GEMINI,
+            AiProvider::TYPE_NVIDIA => $this->callOpenAiCompatible($provider, $model, $prompt, $maxTokens, $timeout),
 
             AiProvider::TYPE_ANTHROPIC,
-            AiProvider::TYPE_ZHIPU => $this->callAnthropic($provider, $model, $prompt),
+            AiProvider::TYPE_ZHIPU => $this->callAnthropic($provider, $model, $prompt, $maxTokens, $timeout),
 
             default => null,
         };
@@ -349,17 +386,17 @@ PROMPT;
     /**
      * Call OpenAI-compatible API (OpenAI, Grok, DeepSeek).
      */
-    protected function callOpenAiCompatible(AiProvider $provider, string $model, string $prompt): ?string
+    protected function callOpenAiCompatible(AiProvider $provider, string $model, string $prompt, int $maxTokens = 300, int $timeout = 15): ?string
     {
         $response = Http::withHeaders([
             'Authorization' => 'Bearer '.$provider->getApiKey(),
             'Content-Type' => 'application/json',
-        ])->timeout(15)->post($provider->getBaseUrl().'/chat/completions', [
+        ])->timeout($timeout)->post($provider->getBaseUrl().'/chat/completions', [
             'model' => $model,
             'messages' => [
                 ['role' => 'user', 'content' => $prompt],
             ],
-            'max_tokens' => 300,
+            'max_tokens' => $maxTokens,
             'temperature' => 0.8,
         ]);
 
@@ -379,7 +416,7 @@ PROMPT;
     /**
      * Call Anthropic-compatible API (Anthropic, ZhipuAI).
      */
-    protected function callAnthropic(AiProvider $provider, string $model, string $prompt): ?string
+    protected function callAnthropic(AiProvider $provider, string $model, string $prompt, int $maxTokens = 300, int $timeout = 15): ?string
     {
         // Build base URL - both Anthropic and ZhipuAI need /v1 before /messages
         $baseUrl = $provider->getBaseUrl();
@@ -391,9 +428,9 @@ PROMPT;
             'x-api-key' => $provider->getApiKey(),
             'anthropic-version' => '2023-06-01',
             'Content-Type' => 'application/json',
-        ])->timeout(15)->post($baseUrl.'/messages', [
+        ])->timeout($timeout)->post($baseUrl.'/messages', [
             'model' => $model,
-            'max_tokens' => 300,
+            'max_tokens' => $maxTokens,
             'messages' => [
                 ['role' => 'user', 'content' => $prompt],
             ],
@@ -586,6 +623,10 @@ PROMPT;
     protected function generateTypingPrompts(int $count, ?string $locale = null): array
     {
         $provider = $this->getProvider();
+        if (! $provider) {
+            return [];
+        }
+
         $model = $this->getModel();
 
         $prompt = $this->buildTypingPromptsPrompt($count, $locale);
@@ -607,15 +648,14 @@ PROMPT;
         $languageInstruction = $this->getLanguageInstruction($locale);
 
         return <<<PROMPT
-Generate exactly {$count} creative prompts that a user might type to an AI website builder.
+Generate exactly {$count} creative prompts that a user might type into a website hosting workspace.
 
-This is a CONVERSATIONAL builder - users describe what they want and AI generates the code.
-NO drag-and-drop references, NO "customize template" language.
+The product supports code import, live preview, visual edits, code edits, publishing, and an optional AI assistant for existing code.
 
 Each prompt should:
 - Be a natural user request (8-12 words)
 - End with "..." to indicate it's a typing animation
-- Sound like someone describing a website to AI
+- Sound like someone managing, editing, or publishing a website
 - Be diverse (apps, landing pages, portfolios, dashboards, etc.)
 {$languageInstruction}
 
@@ -677,6 +717,10 @@ PROMPT;
     protected function generateGreetings(int $count, ?string $locale = null): array
     {
         $provider = $this->getProvider();
+        if (! $provider) {
+            return [];
+        }
+
         $model = $this->getModel();
 
         $prompt = $this->buildGreetingsPrompt($count, $locale);
@@ -699,17 +743,17 @@ PROMPT;
 
         // For non-English locales, provide the format instruction in a language-agnostic way
         $formatExample = $locale && $locale !== 'en'
-            ? '- Format: [Question about building/creating], {name}?'
-            : '- Format: "What [verb] [you/we] [action], {name}?" (e.g., "What do you want to build, {name}?")';
+            ? '- Format: [Question about hosting/editing/publishing], {name}?'
+            : '- Format: "What [site/action] [you/we] [host/edit/publish], {name}?" (e.g., "What site do you want to host, {name}?")';
 
         return <<<PROMPT
-Generate exactly {$count} simple greeting questions for an AI website builder.
+Generate exactly {$count} simple greeting questions for a website hosting and editing workspace.
 
-This is a CONVERSATIONAL builder - users describe what they want and AI builds it.
+Users can import files, edit code, preview, publish, and optionally use an AI assistant.
 
 Rules:
 - MUST use {name} placeholder at the END before the question mark
-- MUST be a simple question about what to build/create/describe
+- MUST be a simple question about what to host/edit/publish/manage
 - NO greetings like "Hello" or "Hi"
 - NO time references (morning/evening)
 - Under 45 characters
@@ -773,6 +817,10 @@ PROMPT;
     protected function generateHeroHeadlines(int $count, ?string $locale = null): array
     {
         $provider = $this->getProvider();
+        if (! $provider) {
+            return [];
+        }
+
         $model = $this->getModel();
 
         $prompt = $this->buildHeroHeadlinesPrompt($count, $locale);
@@ -794,20 +842,19 @@ PROMPT;
         $languageInstruction = $this->getLanguageInstruction($locale);
 
         return <<<PROMPT
-Generate exactly {$count} compelling hero headlines for an AI website builder.
+Generate exactly {$count} compelling hero headlines for a website hosting and live editing platform.
 
-This is a CONVERSATIONAL builder - users describe what they want and AI builds it.
-NO drag-and-drop, NO visual editors - just chat with AI.
+The product lets users import code, edit visually or in code, preview, publish, and optionally use an AI assistant.
 
 Each headline should:
 - Be short and punchy (4-7 words max)
-- Focus on describing/chatting/AI building
+- Focus on hosting, editing, previewing, or publishing websites
 - No punctuation at end (except ? if it's a question)
 - Be varied (mix of questions and statements)
 {$languageInstruction}
 
 Return ONLY a JSON array of strings, nothing else. Example:
-["Describe it. AI builds it.", "What will you create today?", "Chat your website into existence", "Just describe. We build."]
+["Host it today", "What site will you publish?", "Edit your website live", "Bring your site online"]
 PROMPT;
     }
 
@@ -864,6 +911,10 @@ PROMPT;
     protected function generateHeroSubtitles(int $count, ?string $locale = null): array
     {
         $provider = $this->getProvider();
+        if (! $provider) {
+            return [];
+        }
+
         $model = $this->getModel();
 
         $prompt = $this->buildHeroSubtitlesPrompt($count, $locale);
@@ -885,24 +936,24 @@ PROMPT;
         $languageInstruction = $this->getLanguageInstruction($locale);
 
         return <<<PROMPT
-Generate exactly {$count} short subtitles for an AI website builder landing page.
+Generate exactly {$count} short subtitles for a website hosting and live editing platform landing page.
 
-IMPORTANT - This is a CONVERSATIONAL AI builder where users:
-- Chat with AI to describe what they want
-- AI generates the complete website code
-- NO drag and drop, NO visual editors, NO templates to customize
-- Users simply describe their vision in natural language
+IMPORTANT - This is a hosting workspace where users:
+- Import or create static, PHP, and built frontend sites
+- Edit visually or directly in code
+- Preview and publish hosted sites
+- Optionally use an AI assistant to edit existing code
 
 Each subtitle should:
 - Be one single sentence (8-12 words max)
 - Focus on the chat/conversation aspect of building
 - End with a period
 - NO mention of drag-and-drop, visual editors, or templates
-- Emphasize: describe, chat, conversation, AI generates code
+- Emphasize: hosting, live editing, publishing, optional assistant
 {$languageInstruction}
 
 Return ONLY a JSON array of strings, nothing else. Example:
-["Describe your vision and AI builds it for you.", "Chat with AI to create your perfect website."]
+["Import, edit, and publish from one workspace.", "Use live editing and optional AI assistance."]
 PROMPT;
     }
 

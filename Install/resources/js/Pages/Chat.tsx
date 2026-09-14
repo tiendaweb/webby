@@ -1,5 +1,5 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
-import { Head, Link, usePage } from '@inertiajs/react';
+import { useState, useRef, useEffect, useCallback, FormEvent } from 'react';
+import { Head, usePage, router } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -18,35 +18,53 @@ import { useUserChannel } from '@/hooks/useUserChannel';
 import { useTranslation } from '@/contexts/LanguageContext';
 import { PageProps, User } from '@/types';
 import type { UserNotification } from '@/types/notifications';
-import { Home, Eye, Code, Loader2, Hammer, ExternalLink, Brain, Settings, Globe, MousePointerClick, Palette } from 'lucide-react';
+import { Home, Eye, Code, Loader2, Hammer, ExternalLink, Brain, Settings, Globe, MousePointerClick, Palette, Pencil, PanelLeftClose, PanelLeftOpen, History, Rows3, StickyNote, MessageSquare, ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 import { Toaster } from '@/components/ui/sonner';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import axios from 'axios';
 import PublishModal from '@/components/Project/PublishModal';
 import { ProjectSettingsPanel } from '@/components/Project/ProjectSettingsPanel';
+import { BlankProjectPanel } from '@/components/Project/BlankProjectPanel';
+import { ProjectHistoryPanel } from '@/components/Project/ProjectHistoryPanel';
+import { ProjectStructurePanel } from '@/components/Project/ProjectStructurePanel';
+import { ProjectsDialog } from '@/components/Project/ProjectsDialog';
 import { InspectPreview } from '@/components/Preview/InspectPreview';
 import { ChatInputWithMentions } from '@/components/Chat/ChatInputWithMentions';
 import { BuildCreditsIndicator } from '@/components/Chat/BuildCreditsIndicator';
 import { ThemeDesigner } from '@/components/Design/ThemeDesigner';
 import { useBuildCredits, BuildCreditsInfo } from '@/hooks/useBuildCredits';
-import type { ElementMention, PendingEdit } from '@/types/inspector';
+import { buildPublishedUrl } from '@/lib/publishedUrl';
+import type { ElementMention, PendingEdit, VisualEditResponse } from '@/types/inspector';
 import type { AttachedFile } from '@/types/chat';
 
 interface Project {
     id: string;
     name: string;
+    type: 'ai' | 'blank';
     initial_prompt: string | null;
     has_history: boolean;
     conversation_history: Array<{
-        role: 'user' | 'assistant' | 'action';
+        // "note" / "note_result" are the connector lane: messages addressed
+        // to an MCP assistant instead of the AI builder, and its answers.
+        role: 'user' | 'assistant' | 'action' | 'note' | 'note_result';
         content: string;
         timestamp: string;
         category?: string;
         thinking_duration?: number;
         files?: Array<{ id: number; filename: string; mime_type: string }>;
+        note_id?: string;
+        status?: 'pending' | 'in_progress' | 'done' | 'failed' | 'cancelled';
+        source?: string | null;
+        data?: Record<string, unknown> | null;
     }>;
     preview_url: string | null;
     has_active_session: boolean;
+    has_builder?: boolean;
+    ai_provider_available?: boolean;
+    can_use_ai_builder?: boolean;
     build_session_id: string | null;
     // Reconnection-related fields
     build_status?: string;
@@ -114,7 +132,7 @@ interface ChatPageProps extends PageProps {
         unlimited: boolean;
         remaining: number;
     };
-    // Storage & Database props
+    // Storage props
     firebase?: FirebaseSettings;
     storage?: StorageSettings;
     projectFiles?: AttachedFile[];
@@ -122,9 +140,9 @@ interface ChatPageProps extends PageProps {
     buildCredits: BuildCreditsInfo;
 }
 
-type ViewMode = 'preview' | 'inspect' | 'code' | 'design' | 'settings';
+type ViewMode = 'preview' | 'inspect' | 'structure' | 'code' | 'design' | 'history' | 'settings';
 
-const VIEW_MODES: ViewMode[] = ['preview', 'inspect', 'code', 'design', 'settings'];
+const VIEW_MODES: ViewMode[] = ['preview', 'inspect', 'structure', 'code', 'design', 'history', 'settings'];
 
 function getInitialViewMode(): ViewMode {
     if (typeof window === 'undefined') return 'preview';
@@ -191,6 +209,12 @@ export default function Chat({
         },
     });
     const [viewMode, setViewMode] = useState<ViewMode>(getInitialViewMode);
+    const [isChatCollapsed, setIsChatCollapsed] = useState(true);
+    const [renameDialogOpen, setRenameDialogOpen] = useState(false);
+    const [projectsDialogOpen, setProjectsDialogOpen] = useState(false);
+    const [renameValue, setRenameValue] = useState('');
+    const [isRenaming, setIsRenaming] = useState(false);
+    const [projectName, setProjectName] = useState(project.name);
 
     // Sync viewMode to URL
     useEffect(() => {
@@ -204,6 +228,22 @@ export default function Chat({
     }, [viewMode]);
 
     const [prompt, setPrompt] = useState('');
+    /**
+     * Which lane the composer sends to. "ai" is the existing behaviour and
+     * the default — nothing about it changes. "note" stores the message for
+     * an MCP connector to pick up, and never reaches the AI builder.
+     */
+    const [composerMode, setComposerMode] = useState<'ai' | 'note'>(
+        project.can_use_ai_builder === true ? 'ai' : 'note'
+    );
+    /**
+     * Which of the two columns a phone is showing. Desktop shows both side
+     * by side and ignores this; below md they take turns, because the work
+     * panel used to be display:none on mobile and there was simply no way
+     * to reach the editor from a phone.
+     */
+    const [mobilePane, setMobilePane] = useState<'chat' | 'work'>('chat');
+    const [isSavingNote, setIsSavingNote] = useState(false);
     const [selectedFile, setSelectedFile] = useState<string | null>(null);
     const [fileRefreshTrigger, setFileRefreshTrigger] = useState(0);
     const [previewRefreshTrigger, setPreviewRefreshTrigger] = useState(() => Date.now());
@@ -225,6 +265,10 @@ export default function Chat({
     const handleFileUploaded = useCallback((file: AttachedFile) => {
         setLocalProjectFiles(prev => [file, ...prev]);
         setUploadedFiles(prev => [...prev, file]);
+    }, []);
+
+    const handleVisualProjectFileUploaded = useCallback((file: AttachedFile) => {
+        setLocalProjectFiles(prev => [file, ...prev]);
     }, []);
 
     const handleRemoveUploadedFile = useCallback((fileId: number) => {
@@ -276,8 +320,13 @@ export default function Chat({
     // Sound effects for chat events
     const { playSound } = useChatSounds({ settings: soundSettings });
 
-    // Build credits tracking with refresh capability
-    const { credits, isRefreshing: isRefreshingCredits, update: updateCredits } = useBuildCredits(buildCredits);
+    // Build credits tracking with refresh capability (only for AI projects)
+    const canUseAi = project.can_use_ai_builder === true;
+    const showBlankProjectPanelInConversation = project.type === 'blank' && canUseAi;
+    const showBlankProjectPanelInComposer = project.type === 'blank' && !showBlankProjectPanelInConversation;
+    const { credits, isRefreshing: isRefreshingCredits, update: updateCredits } = useBuildCredits(
+        canUseAi ? buildCredits : null
+    );
 
     // Play sound when project is opened
     const hasPlayedOpenSound = useRef(false);
@@ -310,9 +359,9 @@ export default function Chat({
     const handleComplete = useCallback((event: CompleteEvent) => {
         playSound('complete');
         if (event.files_changed) {
-            toast.success(t('Build complete! Files have been updated.'));
+            toast.success(t('Workspace updated. Files have been changed.'));
         } else {
-            toast.success(t('Build complete!'));
+            toast.success(t('Workspace updated.'));
         }
     }, [playSound, t]);
 
@@ -347,13 +396,13 @@ export default function Chat({
         cancelBuild,
         triggerBuild,
         isBuildingPreview,
+        applyNotes,
     } = useBuilderChat(project.id, {
         pusherConfig,
         initialHistory: project.conversation_history,
         initialPreviewUrl: project.preview_url,
-        // Pass initial reconnection state from server
-        initialSessionId: project.build_session_id,
-        initialCanReconnect: project.can_reconnect ?? false,
+        initialSessionId: canUseAi ? project.build_session_id : null,
+        initialCanReconnect: canUseAi ? (project.can_reconnect ?? false) : false,
         onComplete: handleComplete,
         onError: handleError,
         onMessage: handleMessage,
@@ -411,24 +460,25 @@ export default function Chat({
     }, [progress.status, thinkingStartTime]);
 
     // Send initial message from project prompt (only for new projects with no history)
+    // Auto-send initial prompt for AI projects only
     useEffect(() => {
-        if (project.initial_prompt && !initialSent.current && !project.has_history) {
+        if (project.type === 'ai' && project.initial_prompt && !initialSent.current && !project.has_history) {
             initialSent.current = true;
             playSound('send');
             setThinkingStartTime(Date.now());
             setThinkingDuration(null);
             sendMessage(project.initial_prompt);
         }
-    }, [project.initial_prompt, project.has_history, sendMessage, playSound]);
+    }, [project.type, project.initial_prompt, project.has_history, sendMessage, playSound]);
 
-    // Auto-rebuild preview for projects with history but no preview
+    // Auto-rebuild preview for AI projects with history but no preview
     const autoRebuildTriggered = useRef(false);
     useEffect(() => {
-        if (project.has_history && !project.preview_url && project.build_status !== 'building' && !autoRebuildTriggered.current) {
+        if (project.type === 'ai' && project.has_history && !project.preview_url && project.build_status === 'completed' && !autoRebuildTriggered.current) {
             autoRebuildTriggered.current = true;
             triggerBuild();
         }
-    }, [project.has_history, project.preview_url, project.build_status, triggerBuild]);
+    }, [project.type, project.has_history, project.preview_url, project.build_status, triggerBuild]);
 
     // Fetch AI suggestions
     const fetchSuggestions = useCallback(async () => {
@@ -449,8 +499,10 @@ export default function Chat({
     // Track if initial page load is complete
     const isInitialLoad = useRef(true);
 
-    // Fetch suggestions when a new assistant message arrives (deferred on initial load)
+    // Fetch suggestions when a new assistant message arrives (deferred on initial load) - AI projects only
     useEffect(() => {
+        if (!canUseAi) return;
+
         const assistantMessages = messages.filter(m => m.type === 'assistant');
         const currentCount = assistantMessages.length;
 
@@ -473,7 +525,7 @@ export default function Chat({
 
         // For subsequent messages, fetch immediately
         fetchSuggestions();
-    }, [messages, isLoading, fetchSuggestions]);
+    }, [canUseAi, messages, isLoading, fetchSuggestions]);
 
     // Fill input when suggestion is clicked
     const handleSuggestionClick = (suggestion: string) => {
@@ -522,6 +574,88 @@ export default function Chat({
         });
     };
 
+    /**
+     * Store the composer's contents as a note instead of sending it to the
+     * builder. Deliberately does not touch build credits, the builder
+     * health check, or the session — a note is inert until a connector
+     * picks it up.
+     */
+    const handleNoteSubmit = async (e: React.FormEvent, fileData?: { fileIds: number[]; attachedFiles: AttachedFile[] }) => {
+        e.preventDefault();
+
+        const content = prompt.trim();
+
+        if (!content || isSavingNote) return;
+
+        setIsSavingNote(true);
+
+        try {
+            const response = await axios.post(`/project/${project.id}/notes`, {
+                content,
+                files: fileData?.attachedFiles?.map(file => ({
+                    id: file.id,
+                    filename: file.filename,
+                    mime_type: file.mime_type,
+                })),
+            });
+
+            const note = response.data?.note;
+
+            if (note) {
+                applyNotes([{
+                    note_id: note.note_id,
+                    content: note.content,
+                    status: note.status ?? 'pending',
+                    created_at: note.timestamp ?? null,
+                    results: [],
+                }]);
+            }
+
+            setPrompt('');
+            setUploadedFiles([]);
+            toast.success(t('Note saved. A connector can pick it up — the AI builder was not called.'));
+        } catch (error: unknown) {
+            const err = error as { response?: { data?: { error?: string; message?: string } } };
+            toast.error(err.response?.data?.error ?? err.response?.data?.message ?? t('Could not save the note.'));
+        } finally {
+            setIsSavingNote(false);
+        }
+    };
+
+    // Any note still waiting on a connector means the answer can arrive at
+    // any moment, so the page polls until the queue is empty.
+    const hasOpenNotes = messages.some(
+        msg => msg.type === 'note' && (msg.noteStatus === 'pending' || msg.noteStatus === 'in_progress')
+    );
+
+    useEffect(() => {
+        if (!hasOpenNotes) return;
+
+        let cancelled = false;
+
+        const poll = async () => {
+            if (document.hidden) return;
+
+            try {
+                const response = await axios.get(`/project/${project.id}/notes`);
+
+                if (!cancelled && Array.isArray(response.data?.notes)) {
+                    applyNotes(response.data.notes);
+                }
+            } catch {
+                // A failed poll is not worth surfacing; the next one retries.
+            }
+        };
+
+        const interval = setInterval(poll, 10000);
+        poll();
+
+        return () => {
+            cancelled = true;
+            clearInterval(interval);
+        };
+    }, [hasOpenNotes, project.id, applyNotes]);
+
     // Element selection handler for inspect mode
     const handleElementSelect = useCallback((element: ElementMention) => {
         setSelectedElement(element);
@@ -543,21 +677,46 @@ export default function Chat({
         });
     }, []);
 
-    // Save all pending edits to AI
+    // Save all pending visual edits directly to source code
     const handleSaveAllEdits = useCallback(async () => {
         if (pendingEdits.length === 0) return;
 
-        const editLines = pendingEdits.map((edit, i) => {
-            if (edit.field === 'text') {
-                return `${i + 1}. <${edit.element.tagName}${edit.element.cssSelector}>: "${edit.originalValue}" → "${edit.newValue}"`;
-            }
-            return `${i + 1}. <${edit.element.tagName}> ${edit.field}: "${edit.originalValue}" → "${edit.newValue}"`;
-        }).join('\n');
+        for (const edit of pendingEdits) {
+            const response = await axios.post<VisualEditResponse>(`/project/${project.id}/visual-edits`, {
+                selector: edit.element.cssSelector,
+                tagName: edit.element.tagName,
+                field: edit.field,
+                originalValue: edit.originalValue,
+                newValue: edit.newValue,
+            });
 
-        const message = `[BATCH_EDIT] Update multiple elements:\n${editLines}`;
-        await sendMessage(message);
+            if (response.data.needs_source_choice) {
+                throw new Error(response.data.message || t('Choose the source file from the visual edit modal.'));
+            }
+
+            if (!response.data.success) {
+                throw new Error(response.data.error || response.data.message || t('Failed to save changes'));
+            }
+
+            if (response.data.warning) {
+                toast.warning(response.data.warning);
+            }
+        }
+
         setPendingEdits([]);
-    }, [pendingEdits, sendMessage]);
+        setFileRefreshTrigger(value => value + 1);
+        setPreviewRefreshTrigger(Date.now());
+    }, [pendingEdits, project.id, t]);
+
+    const handleVisualEditSaved = useCallback((_response: VisualEditResponse) => {
+        setFileRefreshTrigger(value => value + 1);
+        setPreviewRefreshTrigger(Date.now());
+    }, []);
+
+    const handleSourceChanged = useCallback(() => {
+        setFileRefreshTrigger(value => value + 1);
+        setPreviewRefreshTrigger(Date.now());
+    }, []);
 
     // Discard all pending edits
     const handleDiscardAllEdits = useCallback(() => {
@@ -574,15 +733,36 @@ export default function Chat({
         : null;
 
     // Get status text for header
+    const openRenameDialog = () => {
+        setRenameValue(projectName);
+        setRenameDialogOpen(true);
+    };
+
+    const submitRename = (e: FormEvent) => {
+        e.preventDefault();
+        if (renameValue.trim() === '') return;
+        setIsRenaming(true);
+        router.put(`/projects/${project.id}/rename`, { name: renameValue.trim() }, {
+            preserveState: true,
+            onSuccess: () => {
+                setProjectName(renameValue.trim());
+                setRenameDialogOpen(false);
+                toast.success(t('Project renamed'));
+            },
+            onError: () => toast.error(t('Failed to rename project')),
+            onFinish: () => setIsRenaming(false),
+        });
+    };
+
     const getStatusText = () => {
         if (progress.status === 'connecting') return t('Connecting...');
         if (progress.status === 'running') {
             if (currentAction) {
                 return `${currentAction.action}: ${currentAction.target || ''}`.slice(0, 30);
             }
-            return t('Building...');
+            return t('Updating preview...');
         }
-        if (isLoading) return t('AI working...');
+        if (isLoading) return t('Assistant working...');
         return t('Ready');
     };
 
@@ -591,47 +771,216 @@ export default function Chat({
             <Head title={project.name} />
             <Toaster />
 
-            <div className="h-screen flex bg-background text-foreground">
+            {/* On md+ this is the familiar two-column row. On a phone it becomes
+                a column: the panes take turns inside the wrapper below, and the
+                bar at the bottom switches between them. The wrapper is
+                display:contents on md+, so the two columns stay direct flex
+                children of the row and the desktop layout is untouched. */}
+            <div className="h-screen flex flex-col md:flex-row bg-background text-foreground">
+                <div className="flex min-h-0 min-w-0 flex-1 md:contents">
                 {/* Start: Chat Column - Full width on mobile, fixed width on larger screens */}
-                <div className="w-full md:w-[420px] shrink-0 md:border-e flex flex-col">
-                    {/* Chat Header */}
-                    <div className="h-14 px-4 border-b flex items-center justify-between shrink-0 bg-background">
-                        <div className="min-w-0 flex-1">
-                            {/* Desktop: switch to settings view */}
-                            <button
-                                onClick={() => setViewMode('settings')}
-                                className="hover:underline text-start hidden md:block w-full min-w-0"
-                            >
-                                <h1 className="text-sm font-semibold truncate">
-                                    {project.name}
-                                </h1>
-                            </button>
-                            {/* Mobile: navigate to settings page */}
-                            <Link
-                                href={`/project/${project.id}/settings`}
-                                className="hover:underline md:hidden block w-full min-w-0"
-                            >
-                                <h1 className="text-sm font-semibold truncate">
-                                    {project.name}
-                                </h1>
-                            </Link>
-                            <p className="text-xs text-muted-foreground truncate">
-                                {isLoading ? (
-                                    <span className="flex items-center gap-1.5">
-                                        <Loader2 className="w-3 h-3 animate-spin" />
-                                        {getStatusText()}
-                                    </span>
-                                ) : (
-                                    getStatusText()
+                <div
+                    className={`w-full shrink-0 md:border-e md:flex flex-col transition-[width] duration-200 ${
+                        mobilePane === 'chat' ? 'flex' : 'hidden'
+                    } ${isChatCollapsed ? 'md:w-14' : 'md:w-[420px]'}`}
+                >
+                    {isChatCollapsed && (
+                        <div className="hidden h-full min-h-0 flex-col items-center overflow-y-auto bg-background md:flex">
+                            <div className="flex h-14 shrink-0 items-center justify-center border-b">
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => setIsChatCollapsed(false)}
+                                    title={t('Expand chat panel')}
+                                >
+                                    <PanelLeftOpen className="h-4 w-4" />
+                                </Button>
+                            </div>
+
+                            <div className="flex flex-1 flex-col items-center gap-1 py-2">
+                                <Button
+                                    variant={viewMode === 'preview' ? 'default' : 'ghost'}
+                                    size="icon"
+                                    onClick={() => setViewMode('preview')}
+                                    title={t('Preview')}
+                                    className="h-9 w-9"
+                                >
+                                    <Eye className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                    variant={viewMode === 'inspect' ? 'default' : 'ghost'}
+                                    size="icon"
+                                    onClick={() => setViewMode('inspect')}
+                                    title={t('Inspect')}
+                                    className="h-9 w-9"
+                                >
+                                    <MousePointerClick className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                    variant={viewMode === 'design' ? 'default' : 'ghost'}
+                                    size="icon"
+                                    onClick={() => setViewMode('design')}
+                                    title={t('Design')}
+                                    className="h-9 w-9"
+                                >
+                                    <Palette className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                    variant={viewMode === 'code' ? 'default' : 'ghost'}
+                                    size="icon"
+                                    onClick={() => setViewMode('code')}
+                                    title={t('Code')}
+                                    className="h-9 w-9"
+                                >
+                                    <Code className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                    variant={viewMode === 'settings' ? 'default' : 'ghost'}
+                                    size="icon"
+                                    onClick={() => setViewMode('settings')}
+                                    title={t('Settings')}
+                                    className="h-9 w-9"
+                                >
+                                    <Settings className="h-4 w-4" />
+                                </Button>
+
+                                {viewMode === 'preview' && (
+                                    <>
+                                        <div className="my-1 h-px w-8 bg-border" />
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            onClick={async () => {
+                                                playSound('build');
+                                                await triggerBuild();
+                                                setPreviewRefreshTrigger(Date.now());
+                                            }}
+                                            disabled={isBuildingPreview}
+                                            title={t('Sync Preview')}
+                                            className="h-9 w-9"
+                                        >
+                                            {isBuildingPreview ? (
+                                                <Loader2 className="h-4 w-4 animate-spin" />
+                                            ) : (
+                                                <Hammer className="h-4 w-4" />
+                                            )}
+                                        </Button>
+                                        {progress.previewUrl && (
+                                            <>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    onClick={() => window.open(buildPublishedUrl(project.subdomain, baseDomain) || `/app/${project.id}`, '_blank')}
+                                                    title={t('Open')}
+                                                    className="h-9 w-9"
+                                                >
+                                                    <ExternalLink className="h-4 w-4" />
+                                                </Button>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    onClick={() => setPublishModalOpen(true)}
+                                                    title={project.subdomain ? t('Published') : t('Publish')}
+                                                    className="h-9 w-9"
+                                                >
+                                                    <Globe className="h-4 w-4" />
+                                                </Button>
+                                            </>
+                                        )}
+                                    </>
                                 )}
-                            </p>
+                            </div>
+
+                            <div className="flex shrink-0 flex-col items-center gap-1 border-t py-2">
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={openRenameDialog}
+                                    title={t('Rename project')}
+                                    className="h-9 w-9"
+                                >
+                                    <Pencil className="h-4 w-4" />
+                                </Button>
+                                <ThemeToggle />
+                                <LanguageSelector align="start" />
+                                <NotificationBell
+                                    notifications={notifications}
+                                    unreadCount={unreadCount}
+                                    onMarkAsRead={markAsRead}
+                                    onMarkAllAsRead={markAllAsRead}
+                                    isLoading={isLoadingNotifications}
+                                    align="start"
+                                />
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => setProjectsDialogOpen(true)}
+                                    title={t('Projects')}
+                                >
+                                    <Home className="h-4 w-4" />
+                                </Button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Chat Header */}
+                    <div className={`h-14 px-4 border-b flex items-center justify-between shrink-0 bg-background ${isChatCollapsed ? 'md:hidden' : ''}`}>
+                        <div className="min-w-0 flex-1 flex items-center gap-1">
+                            <div className="min-w-0 flex-1">
+                                {/* Abre los ajustes dentro de la misma pantalla, en las dos
+                                    anchuras. En el móvil hay que traer además el panel de
+                                    trabajo al frente, porque ahí las dos columnas se turnan. */}
+                                <button
+                                    onClick={() => { setViewMode('settings'); setMobilePane('work'); }}
+                                    className="hover:underline text-start block w-full min-w-0"
+                                >
+                                    <h1 className="text-sm font-semibold truncate">
+                                        {projectName}
+                                    </h1>
+                                </button>
+                                <p className="text-xs text-muted-foreground truncate">
+                                    {isLoading ? (
+                                        <span className="flex items-center gap-1.5">
+                                            <Loader2 className="w-3 h-3 animate-spin" />
+                                            {getStatusText()}
+                                        </span>
+                                    ) : (
+                                        getStatusText()
+                                    )}
+                                </p>
+                            </div>
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="shrink-0 h-6 w-6"
+                                onClick={openRenameDialog}
+                                title={t('Rename project')}
+                            >
+                                <Pencil className="h-3 w-3" />
+                            </Button>
                         </div>
                         <div className="flex items-center gap-1">
-                            {/* Mobile only: navigate to settings page (desktop has Settings tab in preview panel) */}
-                            <Button variant="ghost" size="icon" asChild className="md:hidden">
-                                <Link href={`/project/${project.id}/settings`}>
-                                    <Settings className="h-4 w-4" />
-                                </Link>
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="hidden md:inline-flex"
+                                onClick={() => setIsChatCollapsed(true)}
+                                title={t('Collapse chat panel')}
+                            >
+                                <PanelLeftClose className="h-4 w-4" />
+                            </Button>
+                            {/* Sólo en móvil: en escritorio los ajustes ya están en el
+                                panel de trabajo. Lleva al mismo lugar que la pestaña
+                                Ajustes de la barra de abajo — antes cada una abría algo
+                                distinto. */}
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="md:hidden"
+                                onClick={() => { setViewMode('settings'); setMobilePane('work'); }}
+                                title={t('Settings')}
+                            >
+                                <Settings className="h-4 w-4" />
                             </Button>
                             <NotificationBell
                                 notifications={notifications}
@@ -640,20 +989,36 @@ export default function Chat({
                                 onMarkAllAsRead={markAllAsRead}
                                 isLoading={isLoadingNotifications}
                             />
-                            <Button variant="ghost" size="icon" asChild>
-                                <Link href="/create">
-                                    <Home className="h-4 w-4" />
-                                </Link>
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => setProjectsDialogOpen(true)}
+                                title={t('Projects')}
+                            >
+                                <Home className="h-4 w-4" />
                             </Button>
                         </div>
                     </div>
 
+                    <div className={`flex min-h-0 flex-1 flex-col ${isChatCollapsed ? 'md:hidden' : ''}`}>
                     {/* Messages */}
+                    {canUseAi && (
                     <ScrollArea className="flex-1 min-h-0">
                         <div className="p-4 space-y-4">
-                            {initialLoading && messages.length === 0 ? (
+                            {showBlankProjectPanelInConversation && (
+                                <div className="animate-fade-in">
+                                    <BlankProjectPanel
+                                        projectId={project.id}
+                                        previewUrl={project.preview_url}
+                                        subdomain={project.subdomain}
+                                        baseDomain={baseDomain}
+                                    />
+                                </div>
+                            )}
+
+                            {initialLoading && messages.length === 0 && !showBlankProjectPanelInConversation ? (
                                 <MessageListSkeleton count={3} />
-                            ) : messages.length === 0 && !isLoading ? (
+                            ) : messages.length === 0 && !isLoading && !showBlankProjectPanelInConversation ? (
                                 <div className="text-center py-12">
                                     <div className="w-12 h-12 rounded-full bg-primary mx-auto mb-4 flex items-center justify-center">
                                         <span className="text-primary-foreground text-xl">{'\u2728'}</span>
@@ -698,13 +1063,13 @@ export default function Chat({
                                         </p>
                                     </div>
                                     <p className="text-xs text-destructive me-2">
-                                        {t('Builder offline, message not sent')}
+                                        {t('Assistant offline, message not sent')}
                                     </p>
                                 </div>
                             ))}
 
-                            {/* AI Working Indicator */}
-                            {isLoading && (
+                            {/* Assistant working indicator */}
+                            {canUseAi && isLoading && (
                                 <div className="sticky bottom-0 z-10 flex justify-center py-2 bg-gradient-to-t from-background via-background/80 to-transparent">
                                     <div className="flex items-center gap-2 animate-fade-in rounded-full bg-muted/60 backdrop-blur-sm border border-border/50 px-3 py-1.5 shadow-sm">
                                         <Brain className="w-4 h-4 animate-rainbow-icon" />
@@ -721,9 +1086,10 @@ export default function Chat({
                             <div ref={scrollEndRef} />
                         </div>
                     </ScrollArea>
+                    )}
 
                     {/* Floating suggestions - pinned to bottom of messages */}
-                    {(isLoadingSuggestions || (suggestions.length > 0 && !isLoading)) && (
+                    {canUseAi && (isLoadingSuggestions || (suggestions.length > 0 && !isLoading)) && (
                         <div className="relative w-full bg-background py-2">
                             {isLoadingSuggestions ? (
                                 <div className="flex gap-2 px-4">
@@ -757,42 +1123,108 @@ export default function Chat({
 
                     {/* Input */}
                     <div className="pt-2 px-4 pb-4 border-t bg-background">
-                        <div className="pb-1 flex items-center justify-between">
-                            <BuildCreditsIndicator {...credits} isRefreshing={isRefreshingCredits} />
+                        <div className="pb-1 flex flex-wrap items-center gap-2 justify-between">
+                            {canUseAi && composerMode === 'ai' && (
+                                <BuildCreditsIndicator {...credits} isRefreshing={isRefreshingCredits} />
+                            )}
+                            {composerMode === 'note' && (
+                                <span className="inline-flex items-center gap-1.5 text-xs text-amber-700 dark:text-amber-400">
+                                    <StickyNote className="h-3.5 w-3.5" />
+                                    {project.ai_provider_available === false
+                                        ? t('No AI provider is configured. Send saves the prompt for a connector.')
+                                        : t('Saved for the connectors — the AI builder is not called')}
+                                </span>
+                            )}
+                            <div className="flex-1" />
                             <div className="flex items-center gap-2">
+                                {/* Lane switch. The AI side is the default and
+                                    behaves exactly as before; the note side is
+                                    purely additive. */}
+                                {canUseAi && (
+                                    <div className="flex items-center rounded-lg border p-0.5">
+                                        <button
+                                            type="button"
+                                            onClick={() => setComposerMode('ai')}
+                                            className={`flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium transition-colors ${
+                                                composerMode === 'ai'
+                                                    ? 'bg-primary text-primary-foreground'
+                                                    : 'text-muted-foreground hover:text-foreground'
+                                            }`}
+                                            title={t('Send to the AI builder')}
+                                        >
+                                            <Brain className="h-3.5 w-3.5" />
+                                            <span className="hidden sm:inline">{t('AI')}</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setComposerMode('note')}
+                                            className={`flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium transition-colors ${
+                                                composerMode === 'note'
+                                                    ? 'bg-amber-500 text-white'
+                                                    : 'text-muted-foreground hover:text-foreground'
+                                            }`}
+                                            title={t('Save as a note for the connectors')}
+                                        >
+                                            <StickyNote className="h-3.5 w-3.5" />
+                                            <span className="hidden sm:inline">{t('Note')}</span>
+                                        </button>
+                                    </div>
+                                )}
                                 <ThemeToggle />
                                 <LanguageSelector />
                             </div>
                         </div>
+                        {showBlankProjectPanelInComposer && (
+                            <div>
+                                <BlankProjectPanel
+                                    projectId={project.id}
+                                    previewUrl={project.preview_url}
+                                    subdomain={project.subdomain}
+                                    baseDomain={baseDomain}
+                                />
+                            </div>
+                        )}
                         <ChatInputWithMentions
-                            value={prompt}
-                            onChange={setPrompt}
-                            onSubmit={handleSubmit}
-                            disabled={isLoading}
-                            selectedElement={selectedElement}
-                            onClearElement={() => setSelectedElement(null)}
-                            placeholder={t('Describe what you want to build...')}
-                            isLoading={isLoading}
-                            onCancel={cancelBuild}
-                            storageEnabled={storage?.enabled ?? false}
-                            projectId={project.id}
-                            maxFileSizeMb={storage?.maxFileSizeMb ?? 10}
-                            allowedTypes={storage?.allowedTypes ?? null}
-                            projectFiles={localProjectFiles}
-                            uploadedFiles={uploadedFiles}
-                            onFileUploaded={handleFileUploaded}
-                            onRemoveUploadedFile={handleRemoveUploadedFile}
-                            onFilesDropped={handleFilesDropped}
+                                value={prompt}
+                                onChange={setPrompt}
+                                onSubmit={composerMode === 'note' ? handleNoteSubmit : handleSubmit}
+                                disabled={composerMode === 'note' ? isSavingNote : isLoading}
+                                selectedElement={selectedElement}
+                                onClearElement={() => setSelectedElement(null)}
+                                placeholder={
+                                    composerMode === 'note'
+                                        ? t('Leave a note for the connectors — what should they do?')
+                                        : t('Describe what you want to build...')
+                                }
+                                isLoading={composerMode === 'note' ? isSavingNote : isLoading}
+                                onCancel={composerMode === 'note' ? undefined : cancelBuild}
+                                storageEnabled={storage?.enabled ?? false}
+                                projectId={project.id}
+                                maxFileSizeMb={storage?.maxFileSizeMb ?? 10}
+                                allowedTypes={storage?.allowedTypes ?? null}
+                                projectFiles={localProjectFiles}
+                                uploadedFiles={uploadedFiles}
+                                onFileUploaded={handleFileUploaded}
+                                onRemoveUploadedFile={handleRemoveUploadedFile}
+                                onFilesDropped={handleFilesDropped}
                         />
+                    </div>
                     </div>
                 </div>
 
-                {/* Right: Preview/Code Column - Hidden on mobile */}
-                <div className="hidden md:flex flex-1 flex-col overflow-hidden">
+                {/* Right: Preview/Code column. On a phone it takes the whole
+                    screen when selected from the bottom bar; on md+ it sits
+                    beside the chat as before. */}
+                <div className={`${mobilePane === 'work' ? 'flex' : 'hidden'} md:flex flex-1 flex-col overflow-hidden min-w-0`}>
                     {/* Preview Header */}
-                    <div className="h-14 px-4 border-b flex items-center justify-between shrink-0 bg-background">
+                    {/* `isChatCollapsed` es cosa del escritorio: es el raíl lateral, que
+                        ya lleva el selector de vista y las acciones. En el móvil ese raíl
+                        no existe y nada puede desplegarlo, así que dejar que ese estado
+                        ocultara esta cabecera escondía para siempre publicar, abrir y
+                        sincronizar. Acá abajo siempre se ve. */}
+                    <div className={`h-14 px-4 border-b items-center justify-between shrink-0 bg-background flex ${isChatCollapsed ? 'md:hidden' : 'md:flex'}`}>
                         {/* View toggle */}
-                        <div className="flex items-center border rounded-lg overflow-hidden">
+                        <div className="flex items-center border rounded-lg overflow-x-auto max-w-full [&>button]:shrink-0 [&>div]:shrink-0">
                             <button
                                 onClick={() => setViewMode('preview')}
                                 className={`flex items-center gap-2 px-4 py-2 text-sm font-medium transition-all ${
@@ -818,8 +1250,20 @@ export default function Chat({
                             </button>
                             <div className="w-px h-6 bg-border" />
                             <button
+                                onClick={() => setViewMode('structure')}
+                                className={`flex items-center gap-2 px-3 py-2 text-sm font-medium transition-all ${
+                                    viewMode === 'structure'
+                                        ? 'bg-primary text-primary-foreground'
+                                        : 'bg-background text-muted-foreground hover:text-foreground hover:bg-muted'
+                                }`}
+                            >
+                                <Rows3 className="h-4 w-4" />
+                                {t('Structure')}
+                            </button>
+                            <div className="w-px h-6 bg-border" />
+                            <button
                                 onClick={() => setViewMode('design')}
-                                className={`flex items-center gap-2 px-4 py-2 text-sm font-medium transition-all ${
+                                className={`flex items-center gap-2 px-3 py-2 text-sm font-medium transition-all ${
                                     viewMode === 'design'
                                         ? 'bg-primary text-primary-foreground'
                                         : 'bg-background text-muted-foreground hover:text-foreground hover:bg-muted'
@@ -831,7 +1275,7 @@ export default function Chat({
                             <div className="w-px h-6 bg-border" />
                             <button
                                 onClick={() => setViewMode('code')}
-                                className={`flex items-center gap-2 px-4 py-2 text-sm font-medium transition-all ${
+                                className={`flex items-center gap-2 px-3 py-2 text-sm font-medium transition-all ${
                                     viewMode === 'code'
                                         ? 'bg-primary text-primary-foreground'
                                         : 'bg-background text-muted-foreground hover:text-foreground hover:bg-muted'
@@ -840,10 +1284,21 @@ export default function Chat({
                                 <Code className="h-4 w-4" />
                                 {t('Code')}
                             </button>
+                            <button
+                                onClick={() => setViewMode('history')}
+                                className={`flex items-center gap-2 px-3 py-2 text-sm font-medium transition-all ${
+                                    viewMode === 'history'
+                                        ? 'bg-primary text-primary-foreground'
+                                        : 'bg-background text-muted-foreground hover:text-foreground hover:bg-muted'
+                                }`}
+                            >
+                                <History className="h-4 w-4" />
+                                {t('History')}
+                            </button>
                             <div className="w-px h-6 bg-border" />
                             <button
                                 onClick={() => setViewMode('settings')}
-                                className={`flex items-center gap-2 px-4 py-2 text-sm font-medium transition-all ${
+                                className={`flex items-center gap-2 px-3 py-2 text-sm font-medium transition-all ${
                                     viewMode === 'settings'
                                         ? 'bg-primary text-primary-foreground'
                                         : 'bg-background text-muted-foreground hover:text-foreground hover:bg-muted'
@@ -874,14 +1329,14 @@ export default function Chat({
                                         ) : (
                                             <Hammer className="h-4 w-4 me-1.5" />
                                         )}
-                                        {t('Rebuild')}
+                                        {t('Sync Preview')}
                                     </Button>
                                     {progress.previewUrl && (
                                         <>
                                             <Button
                                                 variant="outline"
                                                 size="sm"
-                                                onClick={() => window.open(project.subdomain ? `https://${project.subdomain}.${baseDomain}` : `/app/${project.id}`, '_blank')}
+                                                onClick={() => window.open(buildPublishedUrl(project.subdomain, baseDomain) || `/app/${project.id}`, '_blank')}
                                                 className="h-8"
                                             >
                                                 <ExternalLink className="h-4 w-4 me-1.5" />
@@ -917,10 +1372,44 @@ export default function Chat({
                                 firebase={firebase}
                                 storage={storage}
                             />
-                        ) : viewMode === 'code' ? (
+                        ) : viewMode === 'history' ? (
+                            <ProjectHistoryPanel
+                                projectId={project.id}
+                                onRestored={handleSourceChanged}
+                            />
+                        ) : viewMode === 'structure' ? (
                             <div className="flex h-full">
+                                <div className="w-80 shrink-0 border-e">
+                                    <ProjectStructurePanel
+                                        projectId={project.id}
+                                        onSourceChanged={handleSourceChanged}
+                                        onOpenCode={(path) => {
+                                            setSelectedFile(path);
+                                            setViewMode('code');
+                                        }}
+                                    />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <InspectPreview
+                                        projectId={project.id}
+                                        mode="preview"
+                                        previewUrl={progress.previewUrl}
+                                        refreshTrigger={previewRefreshTrigger}
+                                        isBuilding={isBuildingPreview}
+                                        captureThumbnailTrigger={captureThumbnailTrigger}
+                                    />
+                                </div>
+                            </div>
+                        ) : viewMode === 'code' ? (
+                            /* Side by side on md+. On a phone a 224px tree next
+                               to an editor leaves ~150px of code, so the two
+                               take turns: the tree until a file is picked, then
+                               the editor with a way back. */
+                            <div className="flex h-full min-w-0">
                                 {/* File Tree */}
-                                <div className="w-56 shrink-0 border-e">
+                                <div
+                                    className={`${selectedFile ? 'hidden' : 'block'} w-full shrink-0 border-e md:block md:w-56`}
+                                >
                                     <FileTree
                                         projectId={project.id}
                                         onFileSelect={setSelectedFile}
@@ -929,12 +1418,26 @@ export default function Chat({
                                     />
                                 </div>
                                 {/* Code Editor */}
-                                <div className="flex-1 overflow-hidden">
-                                    <CodeEditor
-                                        projectId={project.id}
-                                        selectedFile={selectedFile}
-                                        onSave={() => setFileRefreshTrigger(tf => tf + 1)}
-                                    />
+                                <div
+                                    className={`${selectedFile ? 'flex' : 'hidden'} min-w-0 flex-1 flex-col overflow-hidden md:flex`}
+                                >
+                                    <button
+                                        type="button"
+                                        onClick={() => setSelectedFile(null)}
+                                        className="flex shrink-0 items-center gap-1.5 border-b px-3 py-2 text-xs font-medium text-muted-foreground hover:text-foreground md:hidden"
+                                    >
+                                        <ArrowLeft className="h-3.5 w-3.5" />
+                                        {t('Files')}
+                                    </button>
+                                    <div className="min-h-0 flex-1 overflow-hidden">
+                                        <CodeEditor
+                                            projectId={project.id}
+                                            selectedFile={selectedFile}
+                                            allowProtectedEdits={project.type === 'blank'}
+                                            refreshTrigger={fileRefreshTrigger}
+                                            onSave={() => setFileRefreshTrigger(tf => tf + 1)}
+                                        />
+                                    </div>
                                 </div>
                             </div>
                         ) : (
@@ -952,6 +1455,8 @@ export default function Chat({
                                 onSaveAllEdits={handleSaveAllEdits}
                                 onDiscardAllEdits={handleDiscardAllEdits}
                                 onRemoveEdit={handleRemoveEdit}
+                                onVisualEditSaved={handleVisualEditSaved}
+                                onProjectFileUploaded={handleVisualProjectFileUploaded}
                                 onThemeSelect={applyThemeToPreview}
                                 isSavingTheme={isSavingTheme}
                                 currentTheme={appliedTheme}
@@ -959,6 +1464,8 @@ export default function Chat({
                                     <ThemeDesigner
                                         currentTheme={appliedTheme}
                                         onThemeSelect={applyThemeToPreview}
+                                        projectId={project.id}
+                                        onColorsChanged={handleSourceChanged}
                                         onApply={async (presetId) => {
                                             setIsSavingTheme(true);
                                             playSound('build');
@@ -992,7 +1499,73 @@ export default function Chat({
                         )}
                     </div>
                 </div>
+                </div>
+
+                {/* Mobile-only pane switcher. Without it the work column is
+                    unreachable from a phone — it used to be display:none. */}
+                <nav className="flex shrink-0 border-t bg-background md:hidden">
+                    {[
+                        { key: 'chat' as const, label: t('Chat'), icon: MessageSquare, onPick: () => setMobilePane('chat') },
+                        { key: 'preview' as const, label: t('Preview'), icon: Eye, onPick: () => { setViewMode('preview'); setMobilePane('work'); } },
+                        { key: 'code' as const, label: t('Code'), icon: Code, onPick: () => { setViewMode('code'); setMobilePane('work'); } },
+                        { key: 'settings' as const, label: t('Settings'), icon: Settings, onPick: () => { setViewMode('settings'); setMobilePane('work'); } },
+                    ].map(item => {
+                        const Icon = item.icon;
+                        const active = item.key === 'chat'
+                            ? mobilePane === 'chat'
+                            : mobilePane === 'work' && viewMode === item.key;
+
+                        return (
+                            <button
+                                key={item.key}
+                                type="button"
+                                onClick={item.onPick}
+                                className={`flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] font-medium transition-colors ${
+                                    active ? 'text-primary' : 'text-muted-foreground'
+                                }`}
+                            >
+                                <Icon className="h-4 w-4" />
+                                {item.label}
+                            </button>
+                        );
+                    })}
+                </nav>
             </div>
+
+            <ProjectsDialog
+                open={projectsDialogOpen}
+                onOpenChange={setProjectsDialogOpen}
+                currentProjectId={project.id}
+            />
+
+            {/* Rename Dialog */}
+            <Dialog open={renameDialogOpen} onOpenChange={setRenameDialogOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>{t('Rename project')}</DialogTitle>
+                    </DialogHeader>
+                    <form onSubmit={submitRename} className="space-y-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="chat-project-name">{t('Project name')}</Label>
+                            <Input
+                                id="chat-project-name"
+                                value={renameValue}
+                                onChange={(e) => setRenameValue(e.target.value)}
+                                autoFocus
+                                maxLength={255}
+                            />
+                        </div>
+                        <DialogFooter>
+                            <Button type="button" variant="outline" onClick={() => setRenameDialogOpen(false)}>
+                                {t('Cancel')}
+                            </Button>
+                            <Button type="submit" disabled={isRenaming || renameValue.trim() === ''}>
+                                {isRenaming ? t('Saving...') : t('Save')}
+                            </Button>
+                        </DialogFooter>
+                    </form>
+                </DialogContent>
+            </Dialog>
 
             {/* Publish Modal */}
             <PublishModal
@@ -1011,5 +1584,3 @@ export default function Chat({
         </>
     );
 }
-
-

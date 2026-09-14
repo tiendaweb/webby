@@ -67,50 +67,50 @@ export interface Feature {
 export const features: Feature[] = [
     {
         id: 'ai-powered',
-        title: 'AI-Powered Development',
-        description: 'Describe what you want, and watch it come to life. Our AI understands context and builds complete applications.',
+        title: 'Desarrollo impulsado por IA',
+        description: 'Describe lo que quieres y mira cómo cobra vida. Nuestra IA entiende el contexto y construye aplicaciones completas.',
         icon: Sparkles,
         size: 'large',
     },
     {
         id: 'real-time',
-        title: 'Real-time Preview',
-        description: 'See your changes instantly as the AI builds your project. No waiting, no refreshing.',
+        title: 'Vista previa en tiempo real',
+        description: 'Ve tus cambios al instante mientras la IA construye tu proyecto. Sin esperar, sin recargar.',
         icon: Eye,
         size: 'medium',
     },
     {
         id: 'code-editor',
-        title: 'Built-in Code Editor',
-        description: 'Full Monaco editor with syntax highlighting, file tree, and code completion.',
+        title: 'Editor de código integrado',
+        description: 'Editor Monaco completo con resaltado de sintaxis, árbol de archivos y autocompletado.',
         icon: Code,
         size: 'medium',
     },
     {
         id: 'export',
-        title: 'Export & Deploy',
-        description: 'Host on our platform or export your code to deploy anywhere.',
+        title: 'Exportar y desplegar',
+        description: 'Aloja en nuestra plataforma o exporta tu código para desplegarlo donde quieras.',
         icon: Download,
         size: 'small',
     },
     {
         id: 'templates',
-        title: 'Smart Templates',
-        description: 'Start with AI-selected templates that match your project needs perfectly.',
+        title: 'Plantillas inteligentes',
+        description: 'Empieza con plantillas seleccionadas por IA que se ajustan perfectamente a las necesidades de tu proyecto.',
         icon: LayoutTemplate,
         size: 'small',
     },
     {
         id: 'iterations',
-        title: 'Iterative Refinement',
-        description: 'Keep chatting to refine and improve your creation until it\'s perfect.',
+        title: 'Refinamiento iterativo',
+        description: 'Sigue chateando para refinar y mejorar tu creación hasta que sea perfecta.',
         icon: MessageSquare,
         size: 'small',
     },
     {
         id: 'custom-subdomains',
-        title: 'Custom Subdomains',
-        description: 'Publish your project to a custom subdomain and share it with the world.',
+        title: 'Subdominios personalizados',
+        description: 'Publica tu proyecto en un subdominio personalizado y compártelo con el mundo.',
         icon: Globe,
         size: 'small',
     },
@@ -127,26 +127,26 @@ export interface Persona {
 export const personas: Persona[] = [
     {
         id: 'developers',
-        title: 'Developers',
-        description: 'Accelerate your workflow with AI-assisted development. Focus on logic while AI handles boilerplate.',
+        title: 'Desarrolladores',
+        description: 'Acelera tu flujo de trabajo con desarrollo asistido por IA. Concéntrate en la lógica mientras la IA se ocupa del código repetitivo.',
         icon: Terminal,
     },
     {
         id: 'entrepreneurs',
-        title: 'Entrepreneurs',
-        description: 'Launch your MVP faster. Go from idea to working prototype in minutes, not weeks.',
+        title: 'Emprendedores',
+        description: 'Lanza tu MVP más rápido. Pasa de la idea al prototipo funcional en minutos, no en semanas.',
         icon: Rocket,
     },
     {
         id: 'designers',
-        title: 'Designers',
-        description: 'Bring your designs to life without writing code. Describe your vision and see it built.',
+        title: 'Diseñadores',
+        description: 'Da vida a tus diseños sin escribir código. Describe tu visión y mírala construirse.',
         icon: Palette,
     },
     {
         id: 'agencies',
-        title: 'Agencies',
-        description: 'Deliver more projects in less time. Scale your output without scaling your team.',
+        title: 'Agencias',
+        description: 'Entrega más proyectos en menos tiempo. Escala tu producción sin escalar tu equipo.',
         icon: Building,
     },
 ];
@@ -158,12 +158,12 @@ export interface Category {
 }
 
 export const categories: Category[] = [
-    { name: 'Landing Pages', icon: Layout },
-    { name: 'Dashboards', icon: LayoutDashboard },
-    { name: 'E-commerce', icon: ShoppingCart },
-    { name: 'Portfolios', icon: Briefcase },
-    { name: 'Web Apps', icon: Globe },
-    { name: 'Admin Panels', icon: Settings },
+    { name: 'Páginas de aterrizaje', icon: Layout },
+    { name: 'Paneles de control', icon: LayoutDashboard },
+    { name: 'Comercio electrónico', icon: ShoppingCart },
+    { name: 'Portafolios', icon: Briefcase },
+    { name: 'Aplicaciones web', icon: Globe },
+    { name: 'Paneles de administración', icon: Settings },
 ];
 
 // Translation function type
@@ -285,24 +285,24 @@ export interface FAQItem {
 export function getTranslatedFAQs(t: TranslationFn): FAQItem[] {
     return [
         {
-            question: t('How does the AI understand what I want to build?'),
-            answer: t('Our AI is trained on millions of web development projects and understands natural language descriptions. Simply describe your project in plain English, and it will generate the appropriate code structure, components, and styling.'),
+            question: t('¿Cómo entiende la IA lo que quiero construir?'),
+            answer: t('Nuestra IA está entrenada con millones de proyectos de desarrollo web y entiende descripciones en lenguaje natural. Solo describe tu proyecto en español sencillo y generará la estructura de código, los componentes y los estilos adecuados.'),
         },
         {
-            question: t('Can I export my code and use it elsewhere?'),
-            answer: t('Absolutely! You own all the code you generate. You can export your entire project as a zip file and deploy it anywhere - on your own servers, Vercel, Netlify, or any other hosting platform.'),
+            question: t('¿Puedo exportar mi código y usarlo en otro lugar?'),
+            answer: t('Sí. Eres dueño de todo el código que generas. Puedes exportar tu proyecto completo como un archivo zip y desplegarlo donde quieras: en tus propios servidores, Vercel, Netlify o cualquier otra plataforma de hosting.'),
         },
         {
-            question: t('What technologies does the generated code use?'),
-            answer: t('Our AI generates modern, production-ready code using React, TypeScript, and Tailwind CSS. The code follows best practices and is fully customizable to fit your needs.'),
+            question: t('¿Qué tecnologías usa el código generado?'),
+            answer: t('Nuestra IA genera código moderno y listo para producción usando React, TypeScript y Tailwind CSS. El código sigue las mejores prácticas y es totalmente personalizable según tus necesidades.'),
         },
         {
-            question: t('Is there a limit to how many projects I can create?'),
-            answer: t('It depends on your plan. Free users can create a limited number of projects, while paid plans offer more or unlimited projects. Check our pricing section for details.'),
+            question: t('¿Hay un límite de cuántos proyectos puedo crear?'),
+            answer: t('Depende de tu plan. Los usuarios gratuitos pueden crear una cantidad limitada de proyectos, mientras que los planes de pago ofrecen más proyectos o proyectos ilimitados. Consulta la sección de precios para más detalles.'),
         },
         {
-            question: t('Can I use my own API keys?'),
-            answer: t('Yes, premium plans allow you to use your own AI API keys. This gives you more control over your usage and can help reduce costs for high-volume users.'),
+            question: t('¿Puedo usar mis propias claves de API?'),
+            answer: t('Sí, los planes premium te permiten usar tus propias claves de API de IA. Esto te da más control sobre tu uso y puede ayudar a reducir costes para usuarios de alto volumen.'),
         },
     ];
 }
@@ -323,19 +323,19 @@ export interface TestimonialItem {
 export function getTranslatedTestimonials(t: TranslationFn): TestimonialItem[] {
     return [
         {
-            quote: t('This tool has transformed how we build websites. What used to take weeks now takes hours.'),
+            quote: t('Esta herramienta ha transformado la forma en que construimos sitios web. Lo que antes tardaba semanas ahora tarda horas.'),
             author: t('Sarah Chen'),
             role: t('Lead Developer at TechFlow'),
             rating: 5,
         },
         {
-            quote: t("The AI understands exactly what I need. It's like having a senior developer on demand."),
+            quote: t('La IA entiende exactamente lo que necesito. Es como tener un desarrollador senior a demanda.'),
             author: t('Marcus Rodriguez'),
             role: t('Founder at LaunchPad'),
             rating: 5,
         },
         {
-            quote: t("We've cut our development time by 80%. The ROI has been incredible."),
+            quote: t('Hemos reducido nuestro tiempo de desarrollo en un 80%. El retorno ha sido increíble.'),
             author: t('Emily Thompson'),
             role: t('CTO at BuildCorp'),
             rating: 5,

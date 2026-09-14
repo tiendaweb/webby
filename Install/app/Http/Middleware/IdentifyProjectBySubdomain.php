@@ -5,6 +5,7 @@ namespace App\Http\Middleware;
 use App\Http\Controllers\PublishedProjectController;
 use App\Models\Project;
 use App\Models\SystemSetting;
+use App\Support\BaseDomainHelper;
 use App\Support\SubdomainHelper;
 use Closure;
 use Illuminate\Http\Request;
@@ -19,19 +20,17 @@ class IdentifyProjectBySubdomain
             return $next($request);
         }
 
-        $baseDomain = SystemSetting::get('domain_base_domain');
+        $host = strtolower($request->getHost());
 
-        if (! $baseDomain) {
+        // Resolve which base domain this host belongs to (primary or alias),
+        // so projects stay reachable on every domain the platform serves.
+        $baseDomain = BaseDomainHelper::match($host);
+
+        if (! $baseDomain || $host === $baseDomain) {
             return $next($request);
         }
 
-        $host = $request->getHost();
-
-        if (! str_ends_with($host, ".{$baseDomain}")) {
-            return $next($request);
-        }
-
-        $subdomain = str_replace(".{$baseDomain}", '', $host);
+        $subdomain = BaseDomainHelper::subdomain($host);
 
         if (empty($subdomain) || $subdomain === 'www') {
             return $next($request);

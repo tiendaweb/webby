@@ -1,5 +1,6 @@
 import { useForm } from '@inertiajs/react';
 import { FormEventHandler, useState } from 'react';
+import axios from 'axios';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -44,11 +45,25 @@ export default function AuthSettingsTab({ settings }: Props) {
 
     const submit: FormEventHandler = (e) => {
         e.preventDefault();
-        put(route('admin.settings.auth'), {
-            preserveScroll: true,
-            onSuccess: () => toast.success(t('Authentication settings updated')),
-            onError: () => toast.error(t('Failed to update settings')),
+
+        // Filter out empty secret fields
+        const submitData = { ...data };
+        const secretFields = ['recaptcha_secret_key', 'google_client_secret', 'facebook_client_secret', 'github_client_secret'];
+        secretFields.forEach(field => {
+            if (!submitData[field as keyof typeof submitData]) {
+                delete submitData[field as keyof typeof submitData];
+            }
         });
+
+        axios.put(route('admin.settings.auth'), submitData)
+            .then(() => {
+                toast.success(t('Authentication settings updated'));
+                window.location.reload();
+            })
+            .catch((error) => {
+                toast.error(t('Failed to update settings'));
+                console.error(error);
+            });
     };
 
     const copyToClipboard = (text: string) => {

@@ -152,7 +152,7 @@ export default function ApplicationLogo({
     };
 
     const siteName = appSettings?.site_name || 'App';
-    const siteTagline = appSettings?.site_tagline || 'Build websites with AI';
+    const siteTagline = appSettings?.site_tagline || 'Host and edit websites';
     // Use preview theme if available (from settings page), otherwise use saved setting
     const colorTheme = previewTheme || appSettings?.color_theme || 'neutral';
     const colors = themeColors[colorTheme];
@@ -182,7 +182,7 @@ export default function ApplicationLogo({
             {showText && (
                 <div>
                     <span className={`font-bold text-foreground ${textSizeClasses[size]}`}>
-                        AAPP HOST
+                        {siteName}
                     </span>
                     {siteTagline && (size === 'lg' || size === 'md') && (
                         <p className="text-[10px] font-medium text-muted-foreground">{siteTagline}</p>

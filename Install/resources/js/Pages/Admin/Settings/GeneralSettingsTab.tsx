@@ -149,7 +149,7 @@ export default function GeneralSettingsTab({ settings }: Props) {
     const [uploadingLogo, setUploadingLogo] = useState(false);
     const [uploadingLogoDark, setUploadingLogoDark] = useState(false);
     const [uploadingFavicon, setUploadingFavicon] = useState(false);
-    const [showPurchaseCode, setShowPurchaseCode] = useState(false);
+    // DESHABILITADO: const [showPurchaseCode, setShowPurchaseCode] = useState(false);
 
     // Gateway compatibility state
     interface GatewayCompatibility {
@@ -165,13 +165,13 @@ export default function GeneralSettingsTab({ settings }: Props) {
         site_tagline: settings.site_tagline || '',
         default_theme: settings.default_theme || 'system',
         color_theme: settings.color_theme || 'neutral',
-        default_locale: settings.default_locale || 'en',
+        default_locale: settings.default_locale || 'es',
         timezone: settings.timezone || 'UTC',
         date_format: settings.date_format || 'Y-m-d',
         landing_page_enabled: settings.landing_page_enabled ?? true,
         default_currency: settings.default_currency || 'USD',
         sentry_enabled: settings.sentry_enabled ?? false,
-        purchase_code: '',
+        // DESHABILITADO: purchase_code: '',
     });
 
     // Apply color theme to document in real-time for instant preview
@@ -292,6 +292,7 @@ export default function GeneralSettingsTab({ settings }: Props) {
                             />
                             {errors.site_description && <p className="text-sm text-destructive">{errors.site_description}</p>}
                         </div>
+                        {/* DESHABILITADO: Purchase Code Field
                         <div className="space-y-2">
                             <div className="flex items-center gap-2">
                                 <Label htmlFor="purchase_code">{t('Purchase Code')}</Label>
@@ -322,6 +323,7 @@ export default function GeneralSettingsTab({ settings }: Props) {
                             <p className="text-xs text-muted-foreground">{t('Your Envato/CodeCanyon purchase code')}</p>
                             {errors.purchase_code && <p className="text-sm text-destructive">{errors.purchase_code}</p>}
                         </div>
+                        */}
                     </div>
 
                     <Separator />

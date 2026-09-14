@@ -3,7 +3,10 @@
 namespace App\Plugins\PaymentGateways;
 
 use App\Contracts\PaymentGatewayPlugin;
+use App\Models\AiConnectorModule;
 use App\Models\Plan;
+use App\Models\Project;
+use App\Models\ProjectAiConnectorActivation;
 use App\Models\Subscription;
 use App\Models\Transaction;
 use App\Models\User;
@@ -183,6 +186,96 @@ class BankTransferPlugin implements PaymentGatewayPlugin
         ];
     }
 
+    /**
+     * Initiate a bank-transfer purchase of an AiConnectorModule for one
+     * project — additive, parallel to initPayment() above (which is Plan/
+     * user-subscription-only). Creates a pending ProjectAiConnectorActivation
+     * + Transaction instead of a Subscription; admin approval flips both to
+     * active via ProjectAiConnectorActivation::approve(), mirroring
+     * Subscription::approve() (see AdminConnectorActivationsReviewTool and
+     * AdminTransactionsReviewTool, both of which call it).
+     */
+    public function initItemPayment(AiConnectorModule $module, Project $project, User $user): array
+    {
+        $existingPending = ProjectAiConnectorActivation::where('project_id', $project->id)
+            ->where('ai_connector_module_id', $module->id)
+            ->where('status', ProjectAiConnectorActivation::STATUS_PENDING)
+            ->first();
+
+        if ($existingPending) {
+            throw new \Exception('There is already a pending bank transfer for this module on this project.');
+        }
+
+        $amount = round((float) $module->price, 2);
+        $reference = 'ACT-'.strtoupper(Str::random(10));
+
+        $activation = ProjectAiConnectorActivation::updateOrCreate(
+            ['project_id' => $project->id, 'ai_connector_module_id' => $module->id],
+            [
+                'user_id' => $user->id,
+                'status' => ProjectAiConnectorActivation::STATUS_PENDING,
+                'amount' => $amount,
+                'payment_method' => Subscription::PAYMENT_BANK_TRANSFER,
+                'external_subscription_id' => $reference,
+                'renewal_at' => $this->calculateModuleRenewalDate($module),
+                'metadata' => ['instructions' => $this->config['instructions'] ?? null],
+                // Reset approval state from any prior cycle — otherwise a project
+                // re-purchasing after a previous approve→cancel round trips back
+                // with a stale approved_at, which makes requiresApproval() return
+                // false even though status is freshly 'pending' (found via manual
+                // testing: a re-purchase on the same project got permanently stuck).
+                'approved_by' => null,
+                'approved_at' => null,
+                'admin_notes' => null,
+                'cancelled_at' => null,
+            ]
+        );
+
+        $transaction = Transaction::create([
+            'user_id' => $user->id,
+            'ai_connector_activation_id' => $activation->id,
+            'amount' => $amount,
+            'currency' => \App\Helpers\CurrencyHelper::getCode(),
+            'status' => Transaction::STATUS_PENDING,
+            'type' => Transaction::TYPE_CONNECTOR_ACTIVATION,
+            'payment_method' => Transaction::PAYMENT_BANK_TRANSFER,
+            'transaction_date' => now(),
+            'metadata' => [
+                'project_id' => $project->id,
+                'ai_connector_module_id' => $module->id,
+                'bank_transfer_instructions' => $this->config['instructions'] ?? null,
+            ],
+        ]);
+
+        if ($this->config['admin_notification'] ?? true) {
+            AdminPaymentNotification::sendIfEnabled(
+                'bank_transfer_pending',
+                $user,
+                null,
+                $transaction,
+                ['ai_connector_module' => $module->name, 'project_name' => $project->name]
+            );
+        }
+
+        return [
+            'type' => 'bank_transfer',
+            'activation_id' => $activation->id,
+            'reference' => $reference,
+            'amount' => $amount,
+            'module_name' => $module->name,
+            'instructions' => $this->config['instructions'] ?? '',
+        ];
+    }
+
+    private function calculateModuleRenewalDate(AiConnectorModule $module): ?\Carbon\Carbon
+    {
+        return match ($module->pricing_type) {
+            AiConnectorModule::PRICING_YEARLY => now()->addYear(),
+            AiConnectorModule::PRICING_ONE_TIME => null,
+            default => now()->addMonth(),
+        };
+    }
+
     public function handleWebhook(Request $request): Response
     {
         // Bank transfer doesn't use webhooks - all processing is manual
@@ -192,7 +285,7 @@ class BankTransferPlugin implements PaymentGatewayPlugin
     public function callback(Request $request): RedirectResponse
     {
         // No callback for manual bank transfers
-        return redirect()->route('create');
+        return redirect()->route('projects.index');
     }
 
     public function cancelSubscription(Subscription $subscription): void
@@ -242,13 +335,13 @@ class BankTransferPlugin implements PaymentGatewayPlugin
     |--------------------------------------------------------------------------
     */
 
-    private function calculateRenewalDate(Plan $plan): \Carbon\Carbon
+    private function calculateRenewalDate(Plan $plan): ?\Carbon\Carbon
     {
         $billingPeriod = $plan->billing_period ?? 'monthly';
 
         return match ($billingPeriod) {
             'yearly' => now()->addYear(),
-            'lifetime' => now()->addYears(100),
+            'lifetime' => null,
             default => now()->addMonth(),
         };
     }

@@ -71,7 +71,7 @@ export default function Login({
                     <Info className="h-4 w-4" />
                     <AlertTitle>Demo Mode</AlertTitle>
                     <AlertDescription>
-                        Use the pre-filled credentials to explore the admin panel (read-only), or register a new account to test the AI website builder.
+                        Use the pre-filled credentials to explore the admin panel (read-only), or register a new account to test the hosting workspace.
                     </AlertDescription>
                 </Alert>
             )}

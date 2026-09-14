@@ -2,6 +2,7 @@ import { Head, Link } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
 import { ProjectSettingsPanel } from '@/components/Project/ProjectSettingsPanel';
+import type { AiConnectorSettings } from '@/components/Project/AiConnectorCard';
 import type { FirebaseConfig } from '@/types/storage';
 
 interface Project {
@@ -73,6 +74,7 @@ interface SettingsProps {
     suggestedSubdomain: string;
     firebase?: FirebaseSettings;
     storage?: StorageSettings;
+    aiConnector?: AiConnectorSettings | null;
     customDomain?: CustomDomainSettings;
     subdomainsGloballyEnabled?: boolean;
     customDomainsGloballyEnabled?: boolean;
@@ -88,6 +90,7 @@ export default function Settings({
     suggestedSubdomain,
     firebase,
     storage,
+    aiConnector,
     customDomain,
     subdomainsGloballyEnabled,
     customDomainsGloballyEnabled,
@@ -123,6 +126,7 @@ export default function Settings({
                         suggestedSubdomain={suggestedSubdomain}
                         firebase={firebase}
                         storage={storage}
+                        aiConnector={aiConnector}
                         customDomain={customDomain}
                         subdomainsGloballyEnabled={subdomainsGloballyEnabled}
                         customDomainsGloballyEnabled={customDomainsGloballyEnabled}

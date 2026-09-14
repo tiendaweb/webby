@@ -163,7 +163,24 @@ Estas tareas están definidas en `routes/console.php`.
 
 ---
 
-## 8) Puesta en marcha local (desarrollo)
+## 8) Puesta en marcha (Docker)
+**Requerimientos**: Docker y Docker Compose instalados.
+
+```bash
+# Levantar la app con Docker
+docker-compose up -d
+
+# Accedé a la aplicación en http://localhost:3100
+# Completá el wizard de instalación en pantalla
+```
+
+Para logs y troubleshooting:
+```bash
+docker-compose logs -f webby   # ver logs en vivo
+docker-compose exec webby bash  # accedé a la terminal del contenedor
+```
+
+## 9) Desarrollo local (sin Docker)
 Desde `Install/`:
 
 ```bash
@@ -186,18 +203,89 @@ npm run test:run  # tests frontend
 
 ---
 
-## 9) Variables y configuración
+## 10) Variables y configuración
 - `.env` se usa para bootstrap base (app/db/etc.).
 - Gran parte de configuración operativa (email, integraciones, providers IA, broadcast, builders, etc.) se administra desde el **panel admin**.
 
 ---
 
-## 10) Despliegue automatizado
+## 11) Cómo hacer que los cambios se reflejen
+
+### Cambios de contenido o configuración administrable
+1. Editá el valor desde el panel admin o desde la base de datos.
+2. Guardá los cambios.
+3. Recargá el navegador con hard refresh.
+
+### Cambios en código frontend/backend
+1. Editá los archivos en `Install/`.
+2. Reconstruí la imagen Docker para incorporar el código nuevo:
+   ```bash
+   docker-compose up -d --build
+   ```
+3. Volvé a abrir `http://localhost:3100` y refrescá el navegador.
+
+### Cambios de base de datos
+1. Agregá o actualizá la migración.
+2. Ejecutá las migraciones en el entorno desplegado.
+3. Reiniciá el contenedor si el cambio afecta al arranque.
+
+---
+
+## 12) Despliegue automatizado
 `Install/autosetup.sh` prepara un servidor Ubuntu (instala PHP/Nginx/MySQL/Node, despliega app Laravel, configura SSL y credenciales). Está pensado para instalaciones VPS automatizadas.
 
 ---
 
-## 11) Recomendaciones operativas
+## 13) Proyectos Blank / Hosting Manual
+
+Webby soporta **proyectos manuales sin IA** para usarlo también como alojador web:
+
+### Crear un proyecto blank
+1. En Projects → "Create Blank Project"
+2. Subí archivos HTML/CSS/JS/PHP individuales, o un ZIP completo
+3. Para React/TypeScript, subí un proyecto Vite con `package.json`, `index.html` y `src/main.tsx`
+4. Usá el botón **Build App** para compilar o sincronizar el preview sin iniciar IA
+5. Publicá a un subdominio cuando esté listo
+
+### API de proyectos blank
+- `POST /api/blank-project/create` — crear proyecto
+- `POST /api/blank-project/{id}/upload-files` — subir archivos individuales
+- `POST /api/blank-project/{id}/upload-zip` — subir ZIP con estructura completa
+- `GET /api/blank-project/{id}/files` — listar archivos
+- `POST /api/blank-project/{id}/preview` — generar/actualizar preview
+- `POST /api/blank-project/{id}/publish` — publicar a subdominio
+- `POST /builder/projects/{id}/build` — compilar/sincronizar un proyecto manual sin builder IA
+
+### Archivos de blank projects
+- Los archivos se almacenan en: `storage/app/project-files/{project_id}/`
+- El preview se sirve desde: `storage/app/previews/{project_id}/`
+- Los archivos se sincronizan automáticamente tras upload
+- React/TypeScript es viable como SPA/Vite compilada a archivos estáticos. No ejecuta un servidor Node persistente ni SSR.
+
+## 14) Localización / i18n
+
+La app soporta **múltiples idiomas** con un sistema custom JSON basado en Laravel:
+
+### Idiomas disponibles
+- `en` — English
+- `es` — Spanish (Castilian)
+- `es_AR` — Spanish (Argentina) con voseo
+- `ar`, `de`, `fr`, `it`, `ja`, `pt`, `ru`, `zh`, `id` — otros idiomas
+
+### Archivo de traducciones
+Localiza las traducciones en `Install/lang/{locale}/`:
+- `admin.json` — Panel de administración
+- `auth.json` — Autenticación y cuenta
+- `chat.json` — Chat e interfaz de build
+- `billing.json`, `projects.json`, `profile.json`, `landing.json` — otros módulos
+
+### Agregar un idioma nuevo
+1. Copiá la carpeta `Install/lang/en/` a `Install/lang/{nuevo_codigo}/`
+2. Editá cada JSON con las traducciones
+3. En Admin → Languages, agregá el idioma nuevo
+4. Seleccionalo en LanguageSelector para probarlo
+
+## 15) Recomendaciones operativas
 1. Configurar al menos un builder activo y un proveedor IA funcional.
 2. Verificar broadcast/realtime para experiencia de chat fluida.
 3. Revisar cron del sistema para que ejecute scheduler de Laravel.
@@ -206,7 +294,7 @@ npm run test:run  # tests frontend
 
 ---
 
-## 12) Resumen funcional
+## 16) Resumen funcional
 Webby combina:
 - **orquestación de IA por chat**,
 - **gestión de proyectos y publicación**,
@@ -217,7 +305,7 @@ Es una base robusta para un producto “AI app builder” multiusuario con contr
 
 ---
 
-## 13) Seguridad
+## 16) Seguridad
 Se añadió una revisión específica de seguridad en `SECURITY_REVIEW.md` con:
 
 - búsqueda de patrones típicos de malware/backdoors,

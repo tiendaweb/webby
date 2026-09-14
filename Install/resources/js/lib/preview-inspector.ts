@@ -26,6 +26,16 @@ interface InspectorElement {
     };
     attributes: Record<string, string>;
     parentTagName: string | null;
+    images?: InspectorImage[];
+}
+
+interface InspectorImage {
+    id: string;
+    cssSelector: string;
+    src: string;
+    currentSrc: string;
+    alt: string;
+    title: string;
 }
 
 interface PendingEdit {
@@ -177,6 +187,27 @@ function getEditableAttributes(element: HTMLElement): Record<string, string> {
 }
 
 /**
+ * Get editable images contained by an element.
+ */
+function getContainedImages(element: HTMLElement): InspectorImage[] {
+    const images = element.tagName.toLowerCase() === 'img'
+        ? [element as HTMLImageElement]
+        : Array.from(element.querySelectorAll('img'));
+
+    return images
+        .map((image, index) => ({
+            id: `${getCssSelector(image as HTMLElement)}-${index}`,
+            cssSelector: getCssSelector(image as HTMLElement),
+            src: image.getAttribute('src') || '',
+            currentSrc: image.currentSrc || image.src || '',
+            alt: image.getAttribute('alt') || '',
+            title: image.getAttribute('title') || '',
+        }))
+        .filter(image => image.src !== '' || image.currentSrc !== '')
+        .slice(0, 20);
+}
+
+/**
  * Serialize an element for postMessage.
  */
 function serializeElement(element: HTMLElement): InspectorElement {
@@ -198,6 +229,7 @@ function serializeElement(element: HTMLElement): InspectorElement {
         },
         attributes: getEditableAttributes(element),
         parentTagName: element.parentElement?.tagName.toLowerCase() || null,
+        images: getContainedImages(element),
     };
 }
 
@@ -220,7 +252,7 @@ function shouldIgnoreElement(element: HTMLElement): boolean {
  * Check if element has editable text.
  */
 function isTextEditable(element: HTMLElement): boolean {
-    const editableTags = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'span', 'label', 'li', 'a', 'button', 'td', 'th'];
+    const editableTags = ['div', 'section', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'span', 'label', 'li', 'a', 'button', 'td', 'th'];
     return editableTags.includes(element.tagName.toLowerCase());
 }
 
@@ -709,6 +741,7 @@ export {
     getXPath,
     getCssSelector,
     getTextPreview,
+    getContainedImages,
     shouldIgnoreElement,
     isTextEditable,
 };

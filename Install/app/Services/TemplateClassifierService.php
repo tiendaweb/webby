@@ -15,12 +15,17 @@ class TemplateClassifierService
      * Valid template categories.
      */
     protected const VALID_CATEGORIES = [
-        'ecommerce' => 'E-commerce store template for online shops, product catalogs, shopping carts, checkout flows, order management',
-        'dashboard' => 'Admin dashboard template for analytics, metrics, data visualization, management panels, admin interfaces',
-        'cms' => 'Blog/CMS template for content management, blog posts, articles, publishing, news sites',
-        'landing' => 'Landing page template for marketing, startup pages, SaaS products, promotional sites, waitlist pages',
-        'portfolio' => 'Portfolio template for showcasing work, projects, galleries, personal sites, resumes',
-        'default' => 'General purpose template for websites that don\'t fit other categories',
+        'saas' => 'SaaS landing and product marketing template for startups, software products, pricing, waitlists, feature launches, and conversion pages',
+        'ecommerce' => 'E-commerce store template for online shops, product catalogs, shopping carts, checkout flows, order management, and inventory',
+        'dashboard' => 'Admin dashboard template for analytics, metrics, data visualization, management panels, reports, and operations interfaces',
+        'cms' => 'Blog/CMS template for content management, blog posts, articles, publishing workflows, editorial sites, and news sites',
+        'portfolio' => 'Portfolio template for showcasing work, projects, galleries, personal brands, resumes, agencies, and freelancers',
+        'crm' => 'CRM and sales pipeline template for leads, contacts, deals, opportunities, follow-ups, tasks, notes, and account management',
+        'booking' => 'Booking and appointments template for services, schedules, reservations, calendars, time slots, consultations, and availability',
+        'learning' => 'Learning platform template for courses, lessons, modules, quizzes, student progress, onboarding, and training portals',
+        'real_estate' => 'Real estate listings template for properties, rentals, filters, galleries, agents, property details, and inquiries',
+        'restaurant' => 'Restaurant and food ordering template for menus, reservations, delivery, pickup, carts, specials, and catering',
+        'default' => 'General purpose template for apps or websites that do not clearly fit another category',
     ];
 
     /**
@@ -28,11 +33,33 @@ class TemplateClassifierService
      */
     protected const KEYWORD_MAPPINGS = [
         // Order matters: more specific categories first, then generic ones
-        'landing' => ['landing', 'marketing', 'startup', 'saas', 'agency', 'launch', 'waitlist', 'promotional'],
-        'portfolio' => ['portfolio', 'showcase', 'gallery', 'resume', 'cv', 'personal'],
-        'cms' => ['blog', 'posts', 'articles', 'content', 'publish', 'editor', 'news', 'magazine', 'cms'],
-        'dashboard' => ['dashboard', 'admin', 'analytics', 'metrics', 'stats', 'reports', 'monitoring', 'panel'],
-        'ecommerce' => ['shop', 'store', 'cart', 'checkout', 'buy', 'sell', 'payment', 'order', 'inventory', 'e-commerce', 'ecommerce'],
+        'restaurant' => ['restaurant', 'food', 'menu', 'delivery', 'pickup', 'reservation', 'catering', 'cafe', 'coffee', 'bar', 'restaurante', 'comida', 'menu', 'menú', 'delivery', 'reserva', 'cafeteria', 'cafetería'],
+        'real_estate' => ['real estate', 'property', 'properties', 'listing', 'listings', 'rental', 'rentals', 'apartment', 'house', 'agent', 'broker', 'inmobiliaria', 'propiedad', 'propiedades', 'alquiler', 'departamento', 'casa'],
+        'learning' => ['course', 'courses', 'lesson', 'lessons', 'learning', 'academy', 'school', 'student', 'quiz', 'training', 'onboarding', 'curso', 'cursos', 'clase', 'clases', 'academia', 'escuela', 'estudiante', 'capacitacion', 'capacitación'],
+        'booking' => ['booking', 'appointment', 'appointments', 'calendar', 'schedule', 'reservation', 'availability', 'consultation', 'clinic', 'salon', 'reserva', 'reservas', 'cita', 'citas', 'turno', 'turnos', 'agenda', 'calendario', 'disponibilidad'],
+        'crm' => ['crm', 'pipeline', 'lead', 'leads', 'contact', 'contacts', 'deal', 'deals', 'opportunity', 'opportunities', 'sales', 'customer relationship', 'cliente', 'clientes', 'ventas', 'contactos', 'oportunidad', 'oportunidades'],
+        'ecommerce' => ['shop', 'store', 'cart', 'checkout', 'buy', 'sell', 'payment', 'order', 'inventory', 'e-commerce', 'ecommerce', 'tienda', 'carrito', 'comprar', 'vender', 'pago', 'pedido', 'inventario'],
+        'dashboard' => ['dashboard', 'admin', 'analytics', 'metrics', 'stats', 'reports', 'monitoring', 'panel', 'kpi', 'analytics', 'tablero', 'administrador', 'metricas', 'métricas', 'reportes', 'monitoreo'],
+        'cms' => ['blog', 'posts', 'articles', 'content', 'publish', 'editor', 'news', 'magazine', 'cms', 'articulos', 'artículos', 'contenido', 'publicar', 'editorial', 'noticias', 'revista'],
+        'portfolio' => ['portfolio', 'showcase', 'gallery', 'resume', 'cv', 'personal', 'freelancer', 'agency', 'portafolio', 'portafolios', 'galeria', 'galería', 'curriculum', 'currículum', 'agencia'],
+        'saas' => ['saas', 'software', 'startup', 'landing', 'marketing', 'launch', 'waitlist', 'pricing', 'features', 'product page', 'promotional', 'lanzamiento', 'precios', 'producto', 'suscripcion', 'suscripción'],
+    ];
+
+    /**
+     * Human-readable labels for template categories.
+     */
+    protected const CATEGORY_LABELS = [
+        'saas' => 'SaaS',
+        'ecommerce' => 'E-commerce',
+        'dashboard' => 'Dashboard',
+        'cms' => 'CMS',
+        'portfolio' => 'Portfolio',
+        'crm' => 'CRM',
+        'booking' => 'Booking',
+        'learning' => 'Learning',
+        'real_estate' => 'Real estate',
+        'restaurant' => 'Restaurant',
+        'default' => 'Default',
     ];
 
     /**
@@ -103,7 +130,7 @@ Available templates:
 
 User's goal: "{$goal}"
 
-Respond with ONLY the template category name (ecommerce, dashboard, cms, landing, portfolio, or default). No explanation, no punctuation, just the single word.
+Respond with ONLY one template category name from this exact list: saas, ecommerce, dashboard, cms, portfolio, crm, booking, learning, real_estate, restaurant, default. No explanation, no punctuation, just the single category.
 PROMPT;
     }
 
@@ -156,10 +183,113 @@ PROMPT;
     }
 
     /**
+     * Get a human-readable label for a template category.
+     */
+    public function getCategoryLabel(string $category): string
+    {
+        return self::CATEGORY_LABELS[$category] ?? self::CATEGORY_LABELS['default'];
+    }
+
+    /**
+     * Suggest the best theme preset for a classified template category.
+     */
+    public function suggestThemePreset(string $category): ?string
+    {
+        return match ($category) {
+            'saas' => 'midnight',
+            'ecommerce' => 'coral',
+            'dashboard' => 'slate',
+            'cms' => 'neutral',
+            'portfolio' => 'forest',
+            'crm' => 'blue',
+            'booking' => 'ocean',
+            'learning' => 'violet',
+            'real_estate' => 'mocha',
+            'restaurant' => 'summer',
+            default => null,
+        };
+    }
+
+    /**
+     * Recommend templates for a project goal, sorted by category fit.
+     *
+     * @return array{category: string, category_label: string, theme_preset: ?string, templates: array<int, array<string, mixed>>}
+     */
+    public function recommendTemplates(string $goal, ?Plan $plan = null, int $limit = 6): array
+    {
+        $category = $this->classify($goal) ?? 'default';
+        $templates = Template::forPlan($plan)->get();
+
+        $ranked = $templates
+            ->sortByDesc(fn (Template $template) => $this->scoreTemplateForGoal($template, $goal, $category))
+            ->values()
+            ->take($limit)
+            ->map(fn (Template $template) => [
+                'id' => $template->id,
+                'slug' => $template->slug,
+                'name' => $template->name,
+                'description' => $template->description,
+                'thumbnail' => $template->thumbnail,
+                'category' => $template->category,
+                'is_system' => $template->is_system,
+                'keywords' => $template->keywords ?? [],
+                'metadata' => $template->metadata ?? null,
+            ])
+            ->all();
+
+        return [
+            'category' => $category,
+            'category_label' => $this->getCategoryLabel($category),
+            'theme_preset' => $this->suggestThemePreset($category),
+            'templates' => $ranked,
+        ];
+    }
+
+    /**
+     * Score a template against a goal and category.
+     */
+    protected function scoreTemplateForGoal(Template $template, string $goal, string $category): int
+    {
+        $score = 0;
+        $goalLower = strtolower($goal);
+
+        if ($template->slug === 'default') {
+            $score += $category === 'default' ? 40 : 5;
+        }
+
+        if (($template->category ?? null) === $category) {
+            $score += 120;
+        }
+
+        if (str_contains(strtolower($template->slug), str_replace('_', '-', $category))) {
+            $score += 50;
+        }
+
+        foreach (($template->keywords ?? []) as $keyword) {
+            $keywordLower = strtolower((string) $keyword);
+            if ($keywordLower !== '' && str_contains($goalLower, $keywordLower)) {
+                $score += 20;
+            }
+        }
+
+        if (str_contains($goalLower, strtolower($template->name))) {
+            $score += 15;
+        }
+
+        return $score;
+    }
+
+    /**
      * Get template by category, filtered by plan.
      */
     public function getTemplateByCategory(string $category, ?Plan $plan = null): ?Template
     {
+        if ($category === 'default') {
+            return Template::forPlan($plan)
+                ->where('slug', 'default')
+                ->first();
+        }
+
         return Template::forPlan($plan)
             ->where('category', $category)
             ->first();
@@ -207,7 +337,9 @@ PROMPT;
         return match ($provider->type) {
             AiProvider::TYPE_OPENAI,
             AiProvider::TYPE_GROK,
-            AiProvider::TYPE_DEEPSEEK => $this->callOpenAiCompatible($provider, $model, $prompt),
+            AiProvider::TYPE_DEEPSEEK,
+            AiProvider::TYPE_GEMINI,
+            AiProvider::TYPE_NVIDIA => $this->callOpenAiCompatible($provider, $model, $prompt),
 
             AiProvider::TYPE_ANTHROPIC,
             AiProvider::TYPE_ZHIPU => $this->callAnthropic($provider, $model, $prompt),

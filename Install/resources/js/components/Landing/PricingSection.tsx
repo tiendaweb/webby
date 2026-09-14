@@ -180,7 +180,7 @@ export function PricingSection({ plans, content, settings: _settings }: PricingS
 
     // Get content with defaults - DB content takes priority
     const title = (content?.title as string) || t('Simple, transparent pricing');
-    const subtitle = (content?.subtitle as string) || t('Choose the plan that fits your needs. All plans include access to our AI-powered website builder.');
+    const subtitle = (content?.subtitle as string) || t('Choose the plan that fits your needs. All plans include website hosting, live editing, and publishing tools.');
 
     return (
         <section id="pricing" className="py-16 lg:py-24">

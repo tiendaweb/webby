@@ -12,6 +12,9 @@ Artisan::command('inspire', function () {
 // Subscription management - daily
 Schedule::command('subscriptions:manage')->daily();
 
+// AI Connector module activations - expire overdue, revoke their tokens - daily
+Schedule::command('ai-connector:manage')->daily();
+
 // Build credits reset - runs on the 1st of each month at midnight
 Schedule::command('credits:reset')->monthlyOn(1, '00:00');
 

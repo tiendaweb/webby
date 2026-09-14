@@ -40,6 +40,8 @@ import {
     Paintbrush,
     Gift,
     Layout,
+    Plug,
+    KeyRound,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import ApplicationLogo from '@/components/ApplicationLogo';
@@ -114,7 +116,6 @@ export function AppSidebar({ user }: AppSidebarProps) {
     const projectItems = [
         { titleKey: 'All Projects', href: '/projects', icon: FolderOpen },
         { titleKey: 'File Manager', href: '/file-manager', icon: Files },
-        { titleKey: 'Database', href: '/database', icon: Database },
         { titleKey: 'Billing', href: '/billing', icon: CreditCard },
         { titleKey: 'Settings', href: '/profile', icon: Settings },
     ];
@@ -126,7 +127,8 @@ export function AppSidebar({ user }: AppSidebarProps) {
         { titleKey: 'Transactions', href: '/admin/transactions', icon: Receipt },
         { titleKey: 'Referrals', href: '/admin/referrals', icon: Gift },
         { titleKey: 'Plans', href: '/admin/plans', icon: Package },
-        { titleKey: 'AI Builders', href: '/admin/ai-builders', icon: Bot },
+        { titleKey: 'Database', href: '/database', icon: Database },
+        { titleKey: 'Assistant Servers', href: '/admin/ai-builders', icon: Bot },
         { titleKey: 'AI Providers', href: '/admin/ai-providers', icon: Cpu },
         { titleKey: 'AI Templates', href: '/admin/ai-templates', icon: LayoutTemplate },
         { titleKey: 'Landing Page', href: '/admin/landing-builder', icon: Layout },
@@ -136,12 +138,24 @@ export function AppSidebar({ user }: AppSidebarProps) {
         { titleKey: 'Settings', href: '/admin/settings', icon: Settings },
     ];
 
+    /**
+     * Everything that has to do with wiring an assistant to this platform.
+     * These used to be scattered — /connect on its own and the other two
+     * buried in Administration — which meant the answer to "where do I
+     * connect Claude?" depended on which of the three you happened to find.
+     */
+    const connectorItems = [
+        { titleKey: 'Connect assistants', href: '/connect', icon: Plug },
+        { titleKey: 'AI Connector module', href: '/admin/ai-connector', icon: Puzzle },
+        { titleKey: 'Connector tokens', href: '/admin/api-tokens', icon: KeyRound },
+    ];
+
     const isActive = (href: string) => url.startsWith(href);
 
     return (
         <Sidebar className="border-r group/sidebar">
             <SidebarHeader className="h-[60px] px-4 border-b flex-row items-center">
-                <Link href="/create" className="flex items-center">
+                <Link href="/projects" className="flex items-center">
                     <ApplicationLogo showText size="lg" />
                 </Link>
             </SidebarHeader>
@@ -157,7 +171,7 @@ export function AppSidebar({ user }: AppSidebarProps) {
                                     <SidebarMenuButton asChild isActive={url === '/create'}>
                                         <Link href="/create">
                                             <Paintbrush className="h-4 w-4" />
-                                            <span>{t('Create')}</span>
+                                            <span>{t('New Site')}</span>
                                         </Link>
                                     </SidebarMenuButton>
                                 </SidebarMenuItem>
@@ -251,6 +265,36 @@ export function AppSidebar({ user }: AppSidebarProps) {
                                                         asChild
                                                         isActive={isActive(item.href)}
                                                     >
+                                                        <Link href={item.href}>
+                                                            <item.icon className="h-4 w-4" />
+                                                            <span>{t(item.titleKey)}</span>
+                                                        </Link>
+                                                    </SidebarMenuButton>
+                                                </SidebarMenuItem>
+                                            ))}
+                                        </SidebarMenu>
+                                    </SidebarGroupContent>
+                                </CollapsibleContent>
+                            </SidebarGroup>
+                        </Collapsible>
+                    )}
+
+                    {/* Connector tools live directly below Administration. */}
+                    {user.role === 'admin' && (
+                        <Collapsible defaultOpen className="group/collapsible">
+                            <SidebarGroup>
+                                <CollapsibleTrigger asChild>
+                                    <SidebarGroupLabel className="cursor-pointer hover:bg-accent rounded-md px-2 py-1.5 flex items-center justify-between">
+                                        <span>{t('Connectors')}</span>
+                                        <ChevronDown className="h-4 w-4 transition-transform group-data-[state=closed]/collapsible:rotate-[-90deg]" />
+                                    </SidebarGroupLabel>
+                                </CollapsibleTrigger>
+                                <CollapsibleContent>
+                                    <SidebarGroupContent>
+                                        <SidebarMenu>
+                                            {connectorItems.map((item) => (
+                                                <SidebarMenuItem key={item.href}>
+                                                    <SidebarMenuButton asChild isActive={isActive(item.href)}>
                                                         <Link href={item.href}>
                                                             <item.icon className="h-4 w-4" />
                                                             <span>{t(item.titleKey)}</span>

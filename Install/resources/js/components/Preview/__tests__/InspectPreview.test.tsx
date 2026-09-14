@@ -189,7 +189,7 @@ describe('InspectPreview', () => {
                 />
             );
 
-            expect(screen.getByText('1 pending change')).toBeInTheDocument();
+            expect(screen.getByText('1 pending visual change')).toBeInTheDocument();
         });
 
         it('hides pending edits panel when no edits', () => {

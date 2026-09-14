@@ -5,13 +5,13 @@ import { Sparkles, Database, Shield, Zap } from 'lucide-react';
 
 export default function Welcome() {
     return (
-        <InstallerLayout title="Welcome to the Installation Wizard">
-            <Head title="Install" />
+        <InstallerLayout title="Bienvenido al asistente de instalación">
+            <Head title="Instalación" />
 
             <div className="text-center mb-8">
                 <p className="text-muted-foreground">
-                    This wizard will guide you through the installation process.
-                    It should only take a few minutes to complete.
+                    Este asistente te guiará durante el proceso de instalación.
+                    Solo debería llevar unos minutos completarlo.
                 </p>
             </div>
 
@@ -21,8 +21,8 @@ export default function Welcome() {
                         <Shield className="w-5 h-5 text-primary" />
                     </div>
                     <div>
-                        <h3 className="font-medium text-sm">Requirements Check</h3>
-                        <p className="text-xs text-muted-foreground">Verify server compatibility</p>
+                        <h3 className="font-medium text-sm">Verificación de requisitos</h3>
+                        <p className="text-xs text-muted-foreground">Comprueba la compatibilidad del servidor</p>
                     </div>
                 </div>
 
@@ -31,8 +31,8 @@ export default function Welcome() {
                         <Zap className="w-5 h-5 text-primary" />
                     </div>
                     <div>
-                        <h3 className="font-medium text-sm">Permissions</h3>
-                        <p className="text-xs text-muted-foreground">Check file permissions</p>
+                        <h3 className="font-medium text-sm">Permisos</h3>
+                        <p className="text-xs text-muted-foreground">Revisa los permisos de archivos</p>
                     </div>
                 </div>
 
@@ -41,8 +41,8 @@ export default function Welcome() {
                         <Database className="w-5 h-5 text-primary" />
                     </div>
                     <div>
-                        <h3 className="font-medium text-sm">Database Setup</h3>
-                        <p className="text-xs text-muted-foreground">Configure your database</p>
+                        <h3 className="font-medium text-sm">Configuración de base de datos</h3>
+                        <p className="text-xs text-muted-foreground">Configura tu base de datos</p>
                     </div>
                 </div>
 
@@ -51,17 +51,17 @@ export default function Welcome() {
                         <Sparkles className="w-5 h-5 text-primary" />
                     </div>
                     <div>
-                        <h3 className="font-medium text-sm">Admin Account</h3>
-                        <p className="text-xs text-muted-foreground">Create your admin user</p>
+                        <h3 className="font-medium text-sm">Cuenta de administrador</h3>
+                        <p className="text-xs text-muted-foreground">Crea tu usuario administrador</p>
                     </div>
                 </div>
             </div>
 
-            <a href={route('install.requirements')}>
-                <Button className="w-full" size="lg">
-                    Get Started
-                </Button>
-            </a>
-        </InstallerLayout>
+                <a href={route('install.requirements')}>
+                    <Button className="w-full" size="lg">
+                    Empezar
+                    </Button>
+                </a>
+            </InstallerLayout>
     );
 }

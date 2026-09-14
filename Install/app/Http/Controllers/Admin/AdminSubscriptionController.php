@@ -273,13 +273,13 @@ class AdminSubscriptionController extends Controller
     /**
      * Calculate the renewal date based on plan billing period.
      */
-    private function calculateRenewalDate(Plan $plan, $startDate): \Carbon\Carbon
+    private function calculateRenewalDate(Plan $plan, $startDate): ?\Carbon\Carbon
     {
         $billingPeriod = $plan->billing_period ?? 'monthly';
 
         return match ($billingPeriod) {
             'yearly' => $startDate->copy()->addYear(),
-            'lifetime' => $startDate->copy()->addYears(100),
+            'lifetime' => null,
             default => $startDate->copy()->addMonth(),
         };
     }

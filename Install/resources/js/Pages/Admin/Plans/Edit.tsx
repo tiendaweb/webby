@@ -42,6 +42,7 @@ interface Plan {
     max_storage_mb: number | null;
     max_file_size_mb: number;
     allowed_file_types: string[] | null;
+    enable_php_runtime: boolean;
 }
 
 interface AiProvider {

@@ -93,6 +93,10 @@ class ProfileController extends Controller
                 'deepseek_key_masked' => $aiSettings->getMaskedApiKeyFor('deepseek'),
                 'has_zhipu_key' => $aiSettings->hasApiKeyFor('zhipu'),
                 'zhipu_key_masked' => $aiSettings->getMaskedApiKeyFor('zhipu'),
+                'has_gemini_key' => $aiSettings->hasApiKeyFor('gemini'),
+                'gemini_key_masked' => $aiSettings->getMaskedApiKeyFor('gemini'),
+                'has_nvidia_key' => $aiSettings->hasApiKeyFor('nvidia'),
+                'nvidia_key_masked' => $aiSettings->getMaskedApiKeyFor('nvidia'),
             ] : null,
             'canUseOwnKey' => $canUseOwnKey,
             'isUsingOwnKey' => $user->isUsingOwnAiApiKey(),
@@ -197,6 +201,8 @@ class ProfileController extends Controller
             'grok_api_key' => ['nullable', 'string'],
             'deepseek_api_key' => ['nullable', 'string'],
             'zhipu_api_key' => ['nullable', 'string'],
+            'gemini_api_key' => ['nullable', 'string'],
+            'nvidia_api_key' => ['nullable', 'string'],
         ]);
 
         $settings = $user->aiSettings ?? new UserAiSettings(['user_id' => $user->id]);
@@ -218,6 +224,12 @@ class ProfileController extends Controller
         }
         if (! empty($validated['zhipu_api_key'])) {
             $settings->zhipu_api_key = $validated['zhipu_api_key'];
+        }
+        if (! empty($validated['gemini_api_key'])) {
+            $settings->gemini_api_key = $validated['gemini_api_key'];
+        }
+        if (! empty($validated['nvidia_api_key'])) {
+            $settings->nvidia_api_key = $validated['nvidia_api_key'];
         }
 
         $settings->save();
@@ -380,6 +392,36 @@ class ProfileController extends Controller
                         'anthropic-version' => '2023-06-01',
                     ])->post(AiProvider::DEFAULT_BASE_URLS[AiProvider::TYPE_ZHIPU].'/v1/messages', [
                         'model' => 'glm-5',
+                        'max_tokens' => 1,
+                        'messages' => [['role' => 'user', 'content' => 'Hi']],
+                    ]);
+
+                    if ($response->successful()) {
+                        return ['success' => true, 'message' => 'Connection successful'];
+                    }
+
+                    return ['success' => false, 'message' => $response->json('error.message', 'Connection failed')];
+
+                case 'gemini':
+                    $response = Http::withHeaders([
+                        'Authorization' => 'Bearer '.$apiKey,
+                    ])->post(AiProvider::DEFAULT_BASE_URLS[AiProvider::TYPE_GEMINI].'/chat/completions', [
+                        'model' => AiProvider::DEFAULT_MODELS[AiProvider::TYPE_GEMINI][0],
+                        'max_tokens' => 1,
+                        'messages' => [['role' => 'user', 'content' => 'Hi']],
+                    ]);
+
+                    if ($response->successful()) {
+                        return ['success' => true, 'message' => 'Connection successful'];
+                    }
+
+                    return ['success' => false, 'message' => $response->json('error.message', 'Connection failed')];
+
+                case 'nvidia':
+                    $response = Http::withHeaders([
+                        'Authorization' => 'Bearer '.$apiKey,
+                    ])->post(AiProvider::DEFAULT_BASE_URLS[AiProvider::TYPE_NVIDIA].'/chat/completions', [
+                        'model' => AiProvider::DEFAULT_MODELS[AiProvider::TYPE_NVIDIA][0],
                         'max_tokens' => 1,
                         'messages' => [['role' => 'user', 'content' => 'Hi']],
                     ]);

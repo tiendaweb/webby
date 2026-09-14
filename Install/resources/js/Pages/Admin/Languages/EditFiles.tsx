@@ -12,9 +12,10 @@ import { useAdminLoading } from '@/hooks/useAdminLoading';
 import { SettingsPageSkeleton } from '@/components/Admin/skeletons';
 import { Save, ArrowLeft, Search } from 'lucide-react';
 import { toast } from 'sonner';
+import type { User } from '@/types';
 
 interface Props {
-    auth: { user?: { id: number } };
+    auth: { user: User };
     language: { id: number; code: string; name: string };
     files: string[];
     selectedFile: string | null;

@@ -1,10 +1,11 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, type DragEvent } from 'react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
-import { RefreshCw, ChevronRight, ChevronDown, FileText, Folder, FolderOpen } from 'lucide-react';
+import { RefreshCw, ChevronRight, ChevronDown, FileText, Folder, FolderOpen, FilePlus, FolderPlus, Pencil, Trash2 } from 'lucide-react';
 import axios from 'axios';
 import { useTranslation } from '@/contexts/LanguageContext';
+import { toast } from 'sonner';
 
 interface FileEntry {
     path: string;
@@ -34,6 +35,9 @@ export function FileTree({ projectId, onFileSelect, selectedFile, refreshTrigger
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [expanded, setExpanded] = useState<Set<string>>(new Set(['.', 'src']));
+    const [selectedPath, setSelectedPath] = useState<string | null>(selectedFile || null);
+    const [isDraggingProjectFile, setIsDraggingProjectFile] = useState(false);
+    const [isUploadingProjectFile, setIsUploadingProjectFile] = useState(false);
 
     const fetchFiles = useCallback(async () => {
         setLoading(true);
@@ -53,6 +57,10 @@ export function FileTree({ projectId, onFileSelect, selectedFile, refreshTrigger
         fetchFiles();
     }, [fetchFiles, refreshTrigger]);
 
+    useEffect(() => {
+        setSelectedPath(selectedFile || null);
+    }, [selectedFile]);
+
     const toggleDir = (path: string) => {
         setExpanded(prev => {
             const next = new Set(prev);
@@ -65,25 +73,220 @@ export function FileTree({ projectId, onFileSelect, selectedFile, refreshTrigger
         });
     };
 
+    const createFile = async () => {
+        const path = window.prompt(t('File path'), 'index.html');
+        if (!path) return;
+
+        try {
+            await axios.post(`/api/blank-project/${projectId}/file`, { path });
+            toast.success(t('File created'));
+            await fetchFiles();
+            setSelectedPath(path);
+            onFileSelect(path);
+        } catch (err) {
+            const message = axios.isAxiosError(err) ? err.response?.data?.error || err.response?.data?.message : null;
+            toast.error(message || t('Failed to create file'));
+        }
+    };
+
+    const createFolder = async () => {
+        const path = window.prompt(t('Folder path'), 'assets');
+        if (!path) return;
+
+        try {
+            await axios.post(`/api/blank-project/${projectId}/folder`, { path });
+            toast.success(t('Folder created'));
+            setExpanded(prev => new Set(prev).add(path));
+            setSelectedPath(path);
+            await fetchFiles();
+        } catch (err) {
+            const message = axios.isAxiosError(err) ? err.response?.data?.error || err.response?.data?.message : null;
+            toast.error(message || t('Failed to create folder'));
+        }
+    };
+
+    const selectNode = (path: string, isDir: boolean) => {
+        setSelectedPath(path);
+
+        if (!isDir) {
+            onFileSelect(path);
+        }
+    };
+
+    const getParentPath = (path: string) => {
+        const index = path.lastIndexOf('/');
+        return index > 0 ? path.slice(0, index) : null;
+    };
+
+    const selectedEntry = selectedPath ? files.find(file => file.path === selectedPath) : null;
+
+    const renameSelected = async () => {
+        if (!selectedPath) return;
+
+        const nextPath = window.prompt(t('New path'), selectedPath);
+        if (nextPath === null) return;
+
+        const trimmedPath = nextPath.trim();
+        if (!trimmedPath || trimmedPath === selectedPath) return;
+
+        try {
+            const response = await axios.patch<{ path?: string }>(`/builder/projects/${projectId}/path`, {
+                from: selectedPath,
+                to: trimmedPath,
+            });
+            const renamedPath = response.data.path || trimmedPath;
+            const originalPath = selectedPath;
+            const wasDirectory = selectedEntry?.is_dir ?? false;
+
+            toast.success(t('Renamed'));
+            setSelectedPath(renamedPath);
+            setExpanded(prev => {
+                const next = new Set(prev);
+                const parent = getParentPath(renamedPath);
+                if (parent) {
+                    next.add(parent);
+                }
+                if (wasDirectory) {
+                    next.add(renamedPath);
+                }
+                return next;
+            });
+            await fetchFiles();
+
+            if (wasDirectory) {
+                if (selectedFile && (selectedFile === originalPath || selectedFile.startsWith(`${originalPath}/`))) {
+                    onFileSelect(`${renamedPath}${selectedFile.slice(originalPath.length)}`);
+                }
+            } else {
+                onFileSelect(renamedPath);
+            }
+        } catch (err) {
+            const message = axios.isAxiosError(err) ? err.response?.data?.error || err.response?.data?.message : null;
+            toast.error(message || t('Failed to rename'));
+        }
+    };
+
+    const deleteSelected = async () => {
+        if (!selectedPath) return;
+        if (!window.confirm(t('Delete selected item?'))) return;
+
+        try {
+            const deletedPath = selectedPath;
+            await axios.delete(`/api/blank-project/${projectId}/path`, { data: { path: deletedPath } });
+            toast.success(t('Deleted'));
+            setSelectedPath(null);
+            if (selectedFile === deletedPath || selectedFile?.startsWith(`${deletedPath}/`)) {
+                onFileSelect('');
+            }
+            await fetchFiles();
+        } catch (err) {
+            const message = axios.isAxiosError(err) ? err.response?.data?.error || err.response?.data?.message : null;
+            toast.error(message || t('Failed to delete'));
+        }
+    };
+
+    const projectFileFromDrop = (event: DragEvent<HTMLDivElement>) => {
+        const allowedExtensions = ['html', 'htm', 'css', 'js', 'mjs', 'jsx', 'ts', 'tsx', 'php', 'json', 'svg'];
+
+        return Array.from(event.dataTransfer.files).find((file) => {
+            const extension = file.name.split('.').pop()?.toLowerCase();
+            return extension ? allowedExtensions.includes(extension) : false;
+        });
+    };
+
+    const handleDragOver = (event: DragEvent<HTMLDivElement>) => {
+        if (!Array.from(event.dataTransfer.types).includes('Files')) return;
+
+        event.preventDefault();
+        event.stopPropagation();
+        event.dataTransfer.dropEffect = 'copy';
+        setIsDraggingProjectFile(true);
+    };
+
+    const handleDragLeave = (event: DragEvent<HTMLDivElement>) => {
+        event.preventDefault();
+        event.stopPropagation();
+
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+            setIsDraggingProjectFile(false);
+        }
+    };
+
+    const handleDrop = async (event: DragEvent<HTMLDivElement>) => {
+        event.preventDefault();
+        event.stopPropagation();
+        setIsDraggingProjectFile(false);
+
+        const projectFile = projectFileFromDrop(event);
+        if (!projectFile) {
+            toast.error(t('Drop an HTML, React, TypeScript, CSS, JS, or PHP file'));
+            return;
+        }
+
+        setIsUploadingProjectFile(true);
+        try {
+            const content = await projectFile.text();
+            await axios.put(`/builder/projects/${projectId}/file`, {
+                path: projectFile.name,
+                content,
+            });
+            toast.success(t('File uploaded'));
+            await fetchFiles();
+            setSelectedPath(projectFile.name);
+            onFileSelect(projectFile.name);
+        } catch (err) {
+            const message = axios.isAxiosError(err) ? err.response?.data?.error || err.response?.data?.message : null;
+            toast.error(message || t('Failed to upload file'));
+        } finally {
+            setIsUploadingProjectFile(false);
+        }
+    };
+
     const tree = buildTree(files);
 
     return (
-        <div className="h-full bg-muted/30 flex flex-col">
+        <div
+            className={`h-full bg-muted/30 flex flex-col transition-colors ${
+                isDraggingProjectFile ? 'bg-primary/10 ring-2 ring-inset ring-primary/40' : ''
+            }`}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+        >
             <div className="h-10 px-3 border-b flex items-center justify-between">
                 <h2 className="text-sm font-semibold">{t('Files')}</h2>
-                <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6"
-                    onClick={fetchFiles}
-                    disabled={loading}
-                >
-                    <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
-                </Button>
+                <div className="flex items-center gap-1">
+                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={createFile} title={t('New file')}>
+                        <FilePlus className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={createFolder} title={t('New folder')}>
+                        <FolderPlus className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={renameSelected} disabled={!selectedPath} title={t('Rename')}>
+                        <Pencil className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={deleteSelected} disabled={!selectedPath} title={t('Delete')}>
+                        <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6"
+                        onClick={fetchFiles}
+                        disabled={loading || isUploadingProjectFile}
+                    >
+                        <RefreshCw className={`h-3.5 w-3.5 ${loading || isUploadingProjectFile ? 'animate-spin' : ''}`} />
+                    </Button>
+                </div>
             </div>
 
             <ScrollArea className="flex-1">
                 <div className="p-2">
+                    {isDraggingProjectFile && (
+                        <div className="mb-2 rounded-md border border-dashed border-primary/60 bg-primary/10 px-2 py-3 text-center text-xs font-medium text-primary">
+                            {t('Drop project file to upload')}
+                        </div>
+                    )}
                     {error ? (
                         <p className="text-destructive text-sm text-center py-4">{error}</p>
                     ) : loading && files.length === 0 ? (
@@ -130,8 +333,8 @@ export function FileTree({ projectId, onFileSelect, selectedFile, refreshTrigger
                             depth={0}
                             expanded={expanded}
                             onToggle={toggleDir}
-                            onSelect={onFileSelect}
-                            selectedFile={selectedFile}
+                            onSelect={selectNode}
+                            selectedPath={selectedPath}
                         />
                     )}
                 </div>
@@ -185,11 +388,11 @@ interface TreeNodeProps {
     depth: number;
     expanded: Set<string>;
     onToggle: (path: string) => void;
-    onSelect: (path: string) => void;
-    selectedFile: string | null;
+    onSelect: (path: string, isDir: boolean) => void;
+    selectedPath: string | null;
 }
 
-function TreeNode({ node, depth, expanded, onToggle, onSelect, selectedFile }: TreeNodeProps) {
+function TreeNode({ node, depth, expanded, onToggle, onSelect, selectedPath }: TreeNodeProps) {
     if (node.name === '.') {
         return (
             <>
@@ -201,7 +404,7 @@ function TreeNode({ node, depth, expanded, onToggle, onSelect, selectedFile }: T
                         expanded={expanded}
                         onToggle={onToggle}
                         onSelect={onSelect}
-                        selectedFile={selectedFile}
+                        selectedPath={selectedPath}
                     />
                 ))}
             </>
@@ -209,7 +412,7 @@ function TreeNode({ node, depth, expanded, onToggle, onSelect, selectedFile }: T
     }
 
     const isExpanded = expanded.has(node.path);
-    const isSelected = node.path === selectedFile;
+    const isSelected = node.path === selectedPath;
     const indent = depth * 12;
 
     const getFileIcon = (name: string) => {
@@ -238,10 +441,9 @@ function TreeNode({ node, depth, expanded, onToggle, onSelect, selectedFile }: T
         <div>
             <div
                 onClick={() => {
+                    onSelect(node.path, node.isDir);
                     if (node.isDir) {
                         onToggle(node.path);
-                    } else {
-                        onSelect(node.path);
                     }
                 }}
                 className={`flex items-center gap-1.5 py-1 px-2 rounded cursor-pointer text-sm
@@ -282,7 +484,7 @@ function TreeNode({ node, depth, expanded, onToggle, onSelect, selectedFile }: T
                             expanded={expanded}
                             onToggle={onToggle}
                             onSelect={onSelect}
-                            selectedFile={selectedFile}
+                            selectedPath={selectedPath}
                         />
                     ))}
                 </>

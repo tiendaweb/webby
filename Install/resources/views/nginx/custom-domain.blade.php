@@ -38,6 +38,7 @@ server {
     }
 
     location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot|zip)$ {
+        try_files $uri /index.php?$query_string;
         expires 1y;
         add_header Cache-Control "public, immutable";
         access_log off;

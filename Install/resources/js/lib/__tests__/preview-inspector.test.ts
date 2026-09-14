@@ -11,6 +11,7 @@ import {
     getXPath,
     getCssSelector,
     getTextPreview,
+    getContainedImages,
     shouldIgnoreElement,
     isTextEditable,
 } from '../preview-inspector';
@@ -181,6 +182,7 @@ describe('preview-inspector utilities', () => {
 
     describe('isTextEditable', () => {
         it.each([
+            'div', 'section',
             'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
             'p', 'span', 'label', 'li', 'a', 'button', 'td', 'th'
         ])('returns true for %s elements', (tag) => {
@@ -188,7 +190,7 @@ describe('preview-inspector utilities', () => {
             expect(isTextEditable(element)).toBe(true);
         });
 
-        it.each(['div', 'section', 'article', 'nav', 'header', 'footer'])('returns false for %s elements', (tag) => {
+        it.each(['article', 'nav', 'header', 'footer'])('returns false for %s elements', (tag) => {
             const element = document.createElement(tag);
             expect(isTextEditable(element)).toBe(false);
         });
@@ -241,10 +243,41 @@ describe('preview-inspector utilities', () => {
             expect(serialized.attributes).toHaveProperty('alt', 'Test image');
         });
 
+        it('includes images contained by section elements', () => {
+            const section = document.createElement('section');
+            const image = document.createElement('img');
+            image.setAttribute('src', 'images/hero.png');
+            image.alt = 'Hero';
+            section.appendChild(image);
+            container.appendChild(section);
+
+            const serialized = serializeElement(section);
+
+            expect(serialized.images).toHaveLength(1);
+            expect(serialized.images?.[0]).toMatchObject({
+                src: 'images/hero.png',
+                alt: 'Hero',
+            });
+            expect(serialized.images?.[0].cssSelector).toBeTruthy();
+        });
+
         it('returns null parentTagName for body children', () => {
             // Container is a direct child of body
             const serialized = serializeElement(container);
             expect(serialized.parentTagName).toBe('body');
+        });
+    });
+
+    describe('getContainedImages', () => {
+        it('returns the selected image itself', () => {
+            const image = document.createElement('img');
+            image.setAttribute('src', 'avatar.webp');
+            container.appendChild(image);
+
+            const images = getContainedImages(image);
+
+            expect(images).toHaveLength(1);
+            expect(images[0].src).toBe('avatar.webp');
         });
     });
 });

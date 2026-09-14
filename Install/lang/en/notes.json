@@ -1,0 +1,21 @@
+{
+    "AI": "AI",
+    "Answered by the connector": "Answered by the connector",
+    "Chat": "Chat",
+    "Could not save the note.": "Could not save the note.",
+    "Details": "Details",
+    "Files": "Files",
+    "Leave a note for the connectors — what should they do?": "Leave a note for the connectors — what should they do?",
+    "Note": "Note",
+    "Note for connectors": "Note for connectors",
+    "Note saved. A connector can pick it up — the AI builder was not called.": "Note saved. A connector can pick it up — the AI builder was not called.",
+    "Save as a note for the connectors": "Save as a note for the connectors",
+    "Saved for the connectors — the AI builder is not called": "Saved for the connectors — the AI builder is not called",
+    "Send to the AI builder": "Send to the AI builder",
+    "No AI provider is configured. Send saves the prompt for a connector.": "No AI provider is configured. Send saves the prompt for a connector.",
+    "a connector is on it": "a connector is on it",
+    "cancelled": "cancelled",
+    "done": "done",
+    "failed": "failed",
+    "waiting for a connector": "waiting for a connector"
+}

@@ -32,7 +32,29 @@ export interface InspectorElement {
     attributes: Record<string, string>;
     /** Parent element's tag name for context */
     parentTagName: string | null;
+    /** Images contained by this element, including itself when the element is an image */
+    images?: InspectorImage[];
 }
+
+/**
+ * Represents an editable image found inside a selected preview element.
+ */
+export interface InspectorImage {
+    /** Stable client-side id for form state */
+    id: string;
+    /** CSS selector that uniquely identifies this image in the preview */
+    cssSelector: string;
+    /** Raw src attribute as rendered in the DOM */
+    src: string;
+    /** Fully resolved browser image URL when available */
+    currentSrc: string;
+    /** Alt text for the image */
+    alt: string;
+    /** Title attribute for the image */
+    title: string;
+}
+
+export type SectionCodeEditScope = 'element' | 'container' | 'section';
 
 /**
  * Simplified element reference for chat mentions.
@@ -64,6 +86,68 @@ export interface PendingEdit {
     newValue: string;
     /** Timestamp when edit was made */
     timestamp: Date;
+}
+
+export type VisualEditField = PendingEdit['field'];
+
+export interface VisualEditPayload {
+    selector: string;
+    tagName: string;
+    field: VisualEditField;
+    originalValue: string;
+    newValue: string;
+    originalValueAliases?: string[];
+    sourcePath?: string;
+    previewPath?: string;
+}
+
+export interface VisualEditCandidate {
+    sourcePath: string;
+    occurrences: number;
+    snippet?: string;
+}
+
+export interface VisualEditResponse {
+    success: boolean;
+    sourcePath?: string;
+    preview_url?: string;
+    warning?: string | null;
+    needs_source_choice?: boolean;
+    candidates?: VisualEditCandidate[];
+    message?: string;
+    error?: string;
+}
+
+export interface SectionCodeCandidate {
+    sourcePath: string;
+    occurrences: number;
+    snippet?: string;
+    matchType?: 'exact' | 'normalized' | 'structure' | 'preview-path';
+    confidence?: number;
+    reason?: string;
+}
+
+export interface SectionCodeResolveResponse {
+    success: boolean;
+    sourcePath?: string;
+    code?: string;
+    language?: string;
+    matchType?: 'exact' | 'normalized' | 'structure' | 'preview-path';
+    confidence?: number;
+    reason?: string;
+    needs_source_choice?: boolean;
+    candidates?: SectionCodeCandidate[];
+    message?: string;
+    error?: string;
+}
+
+export interface SectionCodeSaveResponse {
+    success: boolean;
+    sourcePath?: string;
+    preview_url?: string;
+    warning?: string | null;
+    message?: string;
+    error?: string;
 }
 
 // ============================================

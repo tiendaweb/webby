@@ -103,7 +103,7 @@ export function Navbar({ auth, canLogin, canRegister, enabledSectionTypes = [] }
                         <ThemeToggle />
                         {auth.user ? (
                             <Button asChild>
-                                <Link href="/create">{t('Dashboard')}</Link>
+                                <Link href="/projects">{t('Dashboard')}</Link>
                             </Button>
                         ) : (
                             <>
@@ -170,7 +170,7 @@ export function Navbar({ auth, canLogin, canRegister, enabledSectionTypes = [] }
                                     <div className="flex flex-col gap-3 pt-4 border-t">
                                         {auth.user ? (
                                             <Button asChild className="w-full">
-                                                <Link href="/create">{t('Dashboard')}</Link>
+                                                <Link href="/projects">{t('Dashboard')}</Link>
                                             </Button>
                                         ) : (
                                             <>

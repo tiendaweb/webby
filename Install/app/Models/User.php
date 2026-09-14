@@ -11,11 +11,12 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable implements MustVerifyEmail
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use ConditionallyVerifiesEmail, HasFactory, Notifiable;
+    use ConditionallyVerifiesEmail, HasApiTokens, HasFactory, Notifiable;
 
     /**
      * The attributes that are mass assignable.
@@ -783,7 +784,7 @@ class User extends Authenticatable implements MustVerifyEmail
      */
     public function getLocale(): string
     {
-        return $this->locale ?? SystemSetting::get('default_locale', 'en');
+        return $this->locale ?? SystemSetting::get('default_locale', config('app.locale', 'es'));
     }
 
     /**

@@ -489,11 +489,20 @@ export default function Plans({
                                             disabled={isProcessing}
                                             onClick={() => handleGatewaySelect(gateway)}
                                         >
+                                            {gateway.slug === 'manual' && (
+                                                <Clock className="h-5 w-5 flex-shrink-0 text-primary" />
+                                            )}
                                             <div className="text-start min-w-0 flex-1">
-                                                <div className="font-semibold">{gateway.name}</div>
+                                                <div className="font-semibold">
+                                                    {gateway.slug === 'manual'
+                                                        ? t('Manual — pending confirmation')
+                                                        : gateway.name}
+                                                </div>
                                                 {gateway.description && (
-                                                    <div className="text-xs text-muted-foreground line-clamp-1">
-                                                        {gateway.description}
+                                                    <div className="text-xs text-muted-foreground whitespace-normal leading-relaxed">
+                                                        {gateway.slug === 'manual'
+                                                            ? t('Register the purchase now; an administrator confirms the payment and activates the plan credits.')
+                                                            : gateway.description}
                                                     </div>
                                                 )}
                                             </div>

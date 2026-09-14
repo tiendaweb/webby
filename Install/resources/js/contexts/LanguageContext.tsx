@@ -58,14 +58,6 @@ export function LanguageProvider({ children }: LanguageProviderProps) {
         [props.translations]
     );
 
-    // Debug logs
-    useEffect(() => {
-        console.log('🌍 LanguageContext - Current Locale:', locale);
-        console.log('🌍 LanguageContext - Available Languages:', availableLanguages);
-        console.log('🌍 LanguageContext - Total Translations Loaded:', Object.keys(translations).length);
-        console.log('🌍 LanguageContext - RTL:', isRtl);
-    }, [locale, availableLanguages, translations, isRtl]);
-
     // Apply RTL and lang to document
     useEffect(() => {
         document.documentElement.dir = isRtl ? 'rtl' : 'ltr';
@@ -75,13 +67,11 @@ export function LanguageProvider({ children }: LanguageProviderProps) {
     }, [isRtl, locale]);
 
     const setLocale = useCallback((newLocale: string) => {
-        console.log('🔄 setLocale called with:', newLocale);
         // Store locale and RTL status in localStorage
         localStorage.setItem(STORAGE_KEY, newLocale);
         const newLanguage = availableLanguages.find(
             (lang) => lang.code === newLocale
         );
-        console.log('🔄 Found language:', newLanguage);
         localStorage.setItem(RTL_STORAGE_KEY, String(newLanguage?.is_rtl ?? false));
 
         router.post(
@@ -99,16 +89,12 @@ export function LanguageProvider({ children }: LanguageProviderProps) {
             key: string,
             replacements?: Record<string, string | number>
         ): string => {
-            let translation = translations?.[key] ?? key;
+            const hasTranslation = Object.prototype.hasOwnProperty.call(translations, key);
+            let translation = hasTranslation ? translations[key] : key;
 
-            // Debug: Show if translation was found or using key as fallback
-            if (translations?.[key] !== undefined && key !== translation) {
-                // Translation found, don't spam console
-            } else if (key === translation) {
-                // Key not found, using key as fallback
-                if (key.length < 50) {
-                    console.warn(`⚠️ Translation not found for key: "${key}"`);
-                }
+            // Only warn during development for genuinely missing keys.
+            if (import.meta.env.DEV && !hasTranslation && key.length < 50) {
+                console.warn(`⚠️ Translation not found for key: "${key}"`);
             }
 
             if (replacements) {

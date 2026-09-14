@@ -74,7 +74,7 @@ describe('PendingEditsPanel', () => {
         it('shows correct count for single edit', () => {
             render(<PendingEditsPanel {...defaultProps} />);
 
-            expect(screen.getByText('1 pending change')).toBeInTheDocument();
+            expect(screen.getByText('1 pending visual change')).toBeInTheDocument();
         });
 
         it('shows correct count for multiple edits', () => {
@@ -85,7 +85,7 @@ describe('PendingEditsPanel', () => {
                 />
             );
 
-            expect(screen.getByText('2 pending changes')).toBeInTheDocument();
+            expect(screen.getByText('2 pending visual changes')).toBeInTheDocument();
         });
 
         it('displays text edit details', () => {

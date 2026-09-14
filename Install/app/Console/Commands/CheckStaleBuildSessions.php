@@ -19,8 +19,9 @@ class CheckStaleBuildSessions extends Command
     // Sessions older than this are checked against builder
     private const MIN_AGE_MINUTES = 5;
 
-    // Sessions older than this are force-failed regardless of builder
-    private const HARD_TIMEOUT_MINUTES = 30;
+    // Sessions older than this are force-failed regardless of builder.
+    // Stalled AI provider calls can otherwise leave the UI waiting too long.
+    private const HARD_TIMEOUT_MINUTES = 15;
 
     public function handle(): int
     {
@@ -59,6 +60,8 @@ class CheckStaleBuildSessions extends Command
                     $this->warn("Project {$project->id}: Hard timeout ({$minutesOld} min) - marking failed");
 
                     if (! $dryRun) {
+                        $this->stopBuilderSession($project);
+
                         $project->update([
                             'build_status' => 'failed',
                             'build_completed_at' => now(),
@@ -177,6 +180,25 @@ class CheckStaleBuildSessions extends Command
             ]);
 
             return self::FAILURE;
+        }
+    }
+
+    private function stopBuilderSession(Project $project): void
+    {
+        if (! $project->builder || ! $project->build_session_id) {
+            return;
+        }
+
+        try {
+            Http::timeout(5)
+                ->withHeaders(['X-Server-Key' => $project->builder->server_key])
+                ->post("{$project->builder->full_url}/api/stop/{$project->build_session_id}");
+        } catch (\Exception $e) {
+            Log::warning('Failed to stop timed-out builder session', [
+                'project_id' => $project->id,
+                'session_id' => $project->build_session_id,
+                'error' => $e->getMessage(),
+            ]);
         }
     }
 }

@@ -19,6 +19,7 @@ import {
     FinalCTA,
     Footer,
     AnimatedSection,
+    AnimatedBackground,
     ScrollToTop,
 } from '@/components/Landing';
 
@@ -69,6 +70,15 @@ interface LandingProps extends PageProps {
     // Dynamic sections from database
     sections?: SectionData[];
 
+    // Page metadata
+    page?: {
+        id: number;
+        name: string;
+        slug: string;
+        meta_title?: string | null;
+        meta_description?: string | null;
+    };
+
     // Legacy props for backward compatibility
     suggestions?: string[];
     typingPrompts?: string[];
@@ -105,6 +115,7 @@ export default function Landing({
     plans = [],
     statistics,
     sections = [],
+    page,
     // Legacy props
     suggestions,
     typingPrompts,
@@ -194,6 +205,7 @@ export default function Landing({
                             subtitles: heroSubtitles,
                             cta_button: heroCtaButton,
                         }}
+                        useAnimatedBackground={hasAnimatedBg}
                         trustedBy={{
                             enabled: heroSection?.settings?.show_trusted_by !== false,
                             content: { title: heroContent.trusted_by_title as string },
@@ -232,6 +244,13 @@ export default function Landing({
                         />
                     </AnimatedSection>
                 );
+            case 'html_block': {
+                const htmlCode = section.content?.html_code as string;
+                if (!htmlCode) return null;
+                return (
+                    <div key={`html_block_${index}`} dangerouslySetInnerHTML={{ __html: htmlCode }} />
+                );
+            }
             default: {
                 const Component = SECTION_COMPONENTS[section.type];
                 if (!Component) return null;
@@ -248,18 +267,28 @@ export default function Landing({
         }
     };
 
+    const pageTitle = page?.meta_title || appSettings?.site_tagline || t("Build Websites with AI");
+    // Detect if page has animated background enabled (set via page settings in DB)
+    // The AAPP PRO page has settings: { animated_bg: true }
+    // We pass page settings via the sections array's first element meta - simplest approach is checking page prop
+    const hasAnimatedBg = Boolean(sections.length > 0 && page && page.slug && page.slug !== 'home');
+
     return (
         <>
-            <Head title={appSettings?.site_tagline || t("Build Websites with AI")} />
+            <Head title={pageTitle}>
+                {page?.meta_description && <meta name="description" content={page.meta_description} />}
+            </Head>
             <Toaster />
             {!isPreview && <DemoIframeBlocker />}
-            <Navbar auth={auth} canLogin={canLogin} canRegister={canRegister} enabledSectionTypes={enabledSectionTypes} />
-            <main>
-                {/* Render all sections in their database order */}
-                {enabledSections.map((section, index) => renderSection(section, index))}
-            </main>
-            <Footer />
-            <ScrollToTop />
+            {hasAnimatedBg && <AnimatedBackground />}
+            <div className={`relative ${hasAnimatedBg ? 'z-10' : ''}`}>
+                <Navbar auth={auth} canLogin={canLogin} canRegister={canRegister} enabledSectionTypes={enabledSectionTypes} />
+                <main>
+                    {enabledSections.map((section, index) => renderSection(section, index))}
+                </main>
+                <Footer />
+                <ScrollToTop />
+            </div>
         </>
     );
 }

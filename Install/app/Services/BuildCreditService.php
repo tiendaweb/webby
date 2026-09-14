@@ -146,6 +146,7 @@ class BuildCreditService
             if (! $plan) {
                 return [
                     'allowed' => false,
+                    'code' => 'no_plan',
                     'reason' => __('No active plan. Please subscribe to a plan to start a project.'),
                 ];
             }
@@ -154,6 +155,7 @@ class BuildCreditService
             if ($plan->getMonthlyBuildCredits() === 0 && ! $plan->hasUnlimitedBuildCredits()) {
                 return [
                     'allowed' => false,
+                    'code' => 'no_build_credits',
                     'reason' => __('Your plan does not include AI build credits.'),
                 ];
             }
@@ -162,6 +164,7 @@ class BuildCreditService
             if (! $user->hasBuildCredits(1)) {
                 return [
                     'allowed' => false,
+                    'code' => 'insufficient_credits',
                     'reason' => __('Insufficient build credits. Your credits will reset at the beginning of next month.'),
                 ];
             }
@@ -171,6 +174,7 @@ class BuildCreditService
             if (! $aiProvider) {
                 return [
                     'allowed' => false,
+                    'code' => 'no_ai_provider',
                     'reason' => __('No AI provider is available for your plan. Please contact your administrator to configure AI settings.'),
                 ];
             }
@@ -182,12 +186,13 @@ class BuildCreditService
             if (! $builder) {
                 return [
                     'allowed' => false,
+                    'code' => 'no_builder',
                     'reason' => __('No builder service is available for your plan. Please contact your administrator to configure builder settings.'),
                 ];
             }
         }
 
-        return ['allowed' => true, 'reason' => null];
+        return ['allowed' => true, 'code' => null, 'reason' => null];
     }
 
     /**

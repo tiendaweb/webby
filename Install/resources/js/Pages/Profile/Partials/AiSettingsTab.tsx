@@ -46,6 +46,10 @@ interface AiSettingsTabProps {
         deepseek_key_masked?: string | null;
         has_zhipu_key?: boolean;
         zhipu_key_masked?: string | null;
+        has_gemini_key?: boolean;
+        gemini_key_masked?: string | null;
+        has_nvidia_key?: boolean;
+        nvidia_key_masked?: string | null;
     } | null;
     canUseOwnKey: boolean;
     isUsingOwnKey: boolean;
@@ -78,6 +82,8 @@ export default function AiSettingsTab({
         grok_api_key: '',
         deepseek_api_key: '',
         zhipu_api_key: '',
+        gemini_api_key: '',
+        nvidia_api_key: '',
     });
 
     const handleSubmit = (e: React.FormEvent) => {
@@ -92,6 +98,8 @@ export default function AiSettingsTab({
                     grok_api_key: '',
                     deepseek_api_key: '',
                     zhipu_api_key: '',
+                    gemini_api_key: '',
+                    nvidia_api_key: '',
                 });
             },
             onError: () => {
@@ -155,6 +163,8 @@ export default function AiSettingsTab({
         if (provider === 'grok') return settings?.has_grok_key;
         if (provider === 'deepseek') return settings?.has_deepseek_key;
         if (provider === 'zhipu') return settings?.has_zhipu_key;
+        if (provider === 'gemini') return settings?.has_gemini_key;
+        if (provider === 'nvidia') return settings?.has_nvidia_key;
         return false;
     };
 
@@ -164,6 +174,8 @@ export default function AiSettingsTab({
         if (provider === 'grok') return settings?.grok_key_masked;
         if (provider === 'deepseek') return settings?.deepseek_key_masked;
         if (provider === 'zhipu') return settings?.zhipu_key_masked;
+        if (provider === 'gemini') return settings?.gemini_key_masked;
+        if (provider === 'nvidia') return settings?.nvidia_key_masked;
         return null;
     };
 
@@ -173,6 +185,8 @@ export default function AiSettingsTab({
         if (provider === 'grok') return 'grok_api_key';
         if (provider === 'deepseek') return 'deepseek_api_key';
         if (provider === 'zhipu') return 'zhipu_api_key';
+        if (provider === 'gemini') return 'gemini_api_key';
+        if (provider === 'nvidia') return 'nvidia_api_key';
         return '';
     };
 
@@ -365,6 +379,14 @@ export default function AiSettingsTab({
                                                 {t('Requires a z.ai subscription key (not a direct API key).')}{' '}
                                                 <a href="https://z.ai/subscribe" target="_blank" rel="noopener noreferrer" className="underline">
                                                     {t('Get one here')}
+                                                </a>
+                                            </p>
+                                        )}
+                                        {provider === 'nvidia' && (
+                                            <p className="text-xs text-muted-foreground">
+                                                {t('Uses NVIDIA NIM free prototyping endpoints for Developer Program members.')}{' '}
+                                                <a href="https://build.nvidia.com" target="_blank" rel="noopener noreferrer" className="underline">
+                                                    {t('Get an API key')}
                                                 </a>
                                             </p>
                                         )}

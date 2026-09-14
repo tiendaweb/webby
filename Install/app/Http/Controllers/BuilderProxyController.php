@@ -6,18 +6,24 @@ use App\Models\Builder;
 use App\Models\Project;
 use App\Models\Template;
 use App\Services\BuilderService;
+use App\Services\ProjectRevisionService;
+use App\Services\ProjectWorkspaceService;
 use App\Services\TemplateClassifierService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use InvalidArgumentException;
+use RuntimeException;
 
 class BuilderProxyController extends Controller
 {
     public function __construct(
         protected BuilderService $builderService,
-        protected TemplateClassifierService $templateClassifier
+        protected TemplateClassifierService $templateClassifier,
+        protected ProjectWorkspaceService $workspaceService,
+        protected ProjectRevisionService $revisionService
     ) {}
 
     /**
@@ -45,7 +51,7 @@ class BuilderProxyController extends Controller
         // Block demo admin from starting builds
         if (config('app.demo') && Auth::id() === 1) {
             return response()->json([
-                'error' => 'The demo admin account cannot start builds. Register your own account to test the AI website builder.',
+                'error' => 'The demo admin account cannot start assisted editing sessions. Register your own account to test the optional AI assistant.',
             ], 403);
         }
 
@@ -164,6 +170,8 @@ class BuilderProxyController extends Controller
         }
 
         try {
+            $this->revisionService->create($project, $request->user(), 'ai_start', 'Antes de iniciar generación IA');
+
             // Detect repeated prompts before appending to history
             $promptToSend = $validated['prompt'];
             $repeated = $project->detectRepeatedPrompts($validated['prompt']);
@@ -255,7 +263,7 @@ class BuilderProxyController extends Controller
                 'build_started_at' => $project->build_started_at?->toIso8601String(),
                 'can_reconnect' => $project->build_status === 'building',
                 'preview_url' => Storage::disk('local')->exists("previews/{$project->id}")
-                    ? "/preview/{$project->id}"
+                    ? "/preview/{$project->id}/"
                     : null,
             ]);
         } catch (\Exception $e) {
@@ -266,7 +274,7 @@ class BuilderProxyController extends Controller
                 'build_started_at' => $project->build_started_at?->toIso8601String(),
                 'can_reconnect' => $project->build_status === 'building',
                 'preview_url' => Storage::disk('local')->exists("previews/{$project->id}")
-                    ? "/preview/{$project->id}"
+                    ? "/preview/{$project->id}/"
                     : null,
                 'error' => $e->getMessage(),
             ]);
@@ -283,7 +291,7 @@ class BuilderProxyController extends Controller
         // Block demo admin from continuing AI builds
         if (config('app.demo') && Auth::id() === 1) {
             return response()->json([
-                'error' => 'The demo admin account cannot use the AI builder. Register your own account to test the AI website builder.',
+                'error' => 'The demo admin account cannot use the AI assistant. Register your own account to test assisted editing.',
             ], 403);
         }
 
@@ -326,6 +334,8 @@ class BuilderProxyController extends Controller
         }
 
         try {
+            $this->revisionService->create($project, $request->user(), 'ai_chat', 'Antes de aplicar cambios IA');
+
             // Detect repeated prompts before appending to history
             $messageToSend = $validated['message'];
             $repeated = $project->detectRepeatedPrompts($validated['message']);
@@ -421,6 +431,8 @@ class BuilderProxyController extends Controller
             'build_completed_at' => now(),
         ]);
 
+        $this->revisionService->create($project, $request->user(), 'build_complete', 'Build completado');
+
         return response()->json([
             'success' => true,
         ]);
@@ -466,6 +478,10 @@ class BuilderProxyController extends Controller
     {
         $this->authorize('view', $project);
 
+        if ($project->type === 'blank' && ! $project->builder) {
+            return response()->json($this->workspaceService->listFiles($project));
+        }
+
         // Must have a builder to proceed
         if (! $project->builder) {
             return response()->json([
@@ -498,6 +514,16 @@ class BuilderProxyController extends Controller
             'path' => 'required|string',
         ]);
 
+        if ($project->type === 'blank' && ! $project->builder) {
+            try {
+                return response()->json($this->workspaceService->readFile($project, $validated['path']));
+            } catch (\Throwable $e) {
+                return response()->json([
+                    'error' => $e->getMessage(),
+                ], 404);
+            }
+        }
+
         // Must have a builder to proceed
         if (! $project->builder) {
             return response()->json([
@@ -528,9 +554,27 @@ class BuilderProxyController extends Controller
         $this->authorize('update', $project);
 
         $validated = $request->validate([
-            'path' => 'required|string',
-            'content' => 'required|string',
+            'path'    => 'required|string',
+            'content' => 'nullable|string',
         ]);
+
+        if ($project->type === 'blank' && ! $project->builder) {
+            try {
+                $this->revisionService->create($project, $request->user(), 'file_save', 'Antes de guardar archivo', [
+                    'path' => $validated['path'],
+                ]);
+
+                return response()->json($this->workspaceService->writeFile(
+                    $project,
+                    $validated['path'],
+                    $validated['content'] ?? ''
+                ));
+            } catch (\Throwable $e) {
+                return response()->json([
+                    'error' => $e->getMessage(),
+                ], 422);
+            }
+        }
 
         // Must have a builder to proceed
         if (! $project->builder) {
@@ -540,11 +584,15 @@ class BuilderProxyController extends Controller
         }
 
         try {
+            $this->revisionService->create($project, $request->user(), 'file_save', 'Antes de guardar archivo', [
+                'path' => $validated['path'],
+            ]);
+
             $success = $this->builderService->updateFile(
                 $project->builder,
                 $project->id,
                 $validated['path'],
-                $validated['content']
+                $validated['content'] ?? ''
             );
 
             return response()->json(['success' => $success]);
@@ -556,11 +604,112 @@ class BuilderProxyController extends Controller
     }
 
     /**
+     * Rename a file or directory in workspace.
+     */
+    public function renamePath(Request $request, Project $project): JsonResponse
+    {
+        $this->authorize('update', $project);
+
+        $validated = $request->validate([
+            'from' => 'required|string|max:500',
+            'to' => 'required|string|max:500',
+        ]);
+
+        if ($project->type === 'blank' && ! $project->builder) {
+            try {
+                $this->revisionService->create($project, $request->user(), 'path_rename', 'Antes de renombrar ruta', [
+                    'from' => $validated['from'],
+                    'to' => $validated['to'],
+                ]);
+
+                return response()->json($this->workspaceService->renamePath(
+                    $project,
+                    $validated['from'],
+                    $validated['to']
+                ));
+            } catch (InvalidArgumentException $e) {
+                return response()->json([
+                    'error' => $e->getMessage(),
+                ], 422);
+            } catch (RuntimeException $e) {
+                return response()->json([
+                    'error' => $e->getMessage(),
+                ], $this->statusFromRenameException($e));
+            }
+        }
+
+        if (! $project->builder) {
+            return response()->json([
+                'error' => 'No builder assigned to this project',
+            ], 404);
+        }
+
+        try {
+            $this->revisionService->create($project, $request->user(), 'path_rename', 'Antes de renombrar ruta', [
+                'from' => $validated['from'],
+                'to' => $validated['to'],
+            ]);
+
+            return response()->json($this->builderService->renamePath(
+                $project->builder,
+                $project->id,
+                $validated['from'],
+                $validated['to']
+            ));
+        } catch (RuntimeException $e) {
+            $status = $e->getCode();
+
+            return response()->json([
+                'error' => $e->getMessage(),
+            ], $status >= 400 && $status < 600 ? $status : 500);
+        }
+    }
+
+    private function statusFromRenameException(RuntimeException $e): int
+    {
+        return match ($e->getMessage()) {
+            'Source path not found' => 404,
+            'Destination path already exists' => 409,
+            default => 422,
+        };
+    }
+
+    /**
      * Trigger a build.
      */
     public function triggerBuild(Request $request, Project $project): JsonResponse
     {
         $this->authorize('update', $project);
+
+        if ($project->type === 'blank' && ! $project->builder) {
+            try {
+                $this->workspaceService->syncPreview($project);
+            } catch (\Throwable $e) {
+                $project->forceFill([
+                    'build_status' => 'failed',
+                ])->save();
+
+                return response()->json([
+                    'success' => false,
+                    'error' => $e->getMessage(),
+                ], 422);
+            }
+
+            $runtime = $this->workspaceService->detectRuntime($project);
+            $project->forceFill([
+                'build_status' => 'completed',
+                'build_completed_at' => now(),
+            ])->save();
+
+            return response()->json([
+                'success' => true,
+                'preview_url' => "/preview/{$project->id}/",
+                'runtime' => $runtime,
+                'message' => $runtime === 'frontend'
+                    ? 'Frontend app built successfully.'
+                    : 'Preview synced successfully.',
+            ]);
+        }
 
         // Must have a builder to proceed
         if (! $project->builder) {

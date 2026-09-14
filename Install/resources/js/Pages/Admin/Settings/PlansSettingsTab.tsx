@@ -137,17 +137,17 @@ export default function PlansSettingsTab({ settings, plans, aiProviders, builder
                         <div className="space-y-2">
                             <Label htmlFor="default_builder_id" className="flex items-center gap-2">
                                 <Server className="h-4 w-4" />
-                                {t('Default Builder')}
+                                {t('Default Assistant Server')}
                             </Label>
                             <Select
                                 value={data.default_builder_id}
                                 onValueChange={(value) => setData('default_builder_id', value)}
                             >
                                 <SelectTrigger className="max-w-md">
-                                    <SelectValue placeholder={t('Select a builder')} />
+                                    <SelectValue placeholder={t('Select an assistant server')} />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="none">{t('No default builder')}</SelectItem>
+                                    <SelectItem value="none">{t('No default assistant server')}</SelectItem>
                                     {builders.map((builder) => (
                                         <SelectItem key={builder.id} value={builder.id.toString()}>
                                             {builder.name}
@@ -156,7 +156,7 @@ export default function PlansSettingsTab({ settings, plans, aiProviders, builder
                                 </SelectContent>
                             </Select>
                             <p className="text-sm text-muted-foreground">
-                                {t('Used when a plan does not have a specific builder assigned')}
+                                {t('Used when a plan does not have a specific assistant server assigned')}
                             </p>
                             {errors.default_builder_id && (
                                 <p className="text-sm text-destructive">{errors.default_builder_id}</p>
@@ -167,7 +167,7 @@ export default function PlansSettingsTab({ settings, plans, aiProviders, builder
                             <Alert variant="destructive">
                                 <Info className="h-4 w-4" />
                                 <AlertDescription>
-                                    {t('No AI providers or builders configured. Please add them first.')}
+                                    {t('No AI providers or assistant servers configured. Please add them first.')}
                                 </AlertDescription>
                             </Alert>
                         )}

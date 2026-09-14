@@ -62,7 +62,7 @@ class HandleInertiaRequests extends Middleware
                 'site_favicon' => SystemSetting::get('site_favicon'),
                 'default_theme' => SystemSetting::get('default_theme', 'system'),
                 'color_theme' => SystemSetting::get('color_theme', 'neutral'),
-                'default_locale' => SystemSetting::get('default_locale', 'en'),
+                'default_locale' => SystemSetting::get('default_locale', config('app.locale', 'es')),
                 'timezone' => SystemSetting::get('timezone', 'UTC'),
                 'date_format' => SystemSetting::get('date_format', 'Y-m-d'),
                 'landing_page_enabled' => SystemSetting::get('landing_page_enabled', true),
@@ -160,8 +160,9 @@ class HandleInertiaRequests extends Middleware
         $translations = $this->loadTranslationsFromDirectory($locale);
 
         // Fallback to English if current locale has no translations
-        if (empty($translations) && $locale !== 'en') {
-            $translations = $this->loadTranslationsFromDirectory('en');
+        $fallbackLocale = config('app.fallback_locale', config('app.locale', 'es'));
+        if (empty($translations) && $locale !== $fallbackLocale) {
+            $translations = $this->loadTranslationsFromDirectory($fallbackLocale);
         }
 
         return $translations;
@@ -233,7 +234,7 @@ class HandleInertiaRequests extends Middleware
         } catch (\Exception $e) {
             // Database not available (fresh install)
             return [
-                'current' => 'en',
+                'current' => config('app.locale', 'es'),
                 'isRtl' => false,
                 'available' => [],
             ];

@@ -4,11 +4,14 @@ namespace App\Http\Controllers;
 
 use App\Models\Plan;
 use App\Models\Subscription;
+use App\Models\Transaction;
 use App\Services\PluginManager;
 use App\Services\ReferralRedemptionService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class PaymentGatewayController extends Controller
 {
@@ -56,7 +59,7 @@ class PaymentGatewayController extends Controller
         if (! $plugin) {
             Log::warning('Payment callback received without gateway parameter');
 
-            return redirect()->route('create')
+            return redirect()->route('projects.index')
                 ->with('error', 'Invalid payment callback.');
         }
 
@@ -66,7 +69,7 @@ class PaymentGatewayController extends Controller
             if (! $gateway) {
                 Log::warning("Payment callback received for unknown gateway: {$plugin}");
 
-                return redirect()->route('create')
+                return redirect()->route('projects.index')
                     ->with('error', 'Payment gateway not found.');
             }
 
@@ -80,7 +83,7 @@ class PaymentGatewayController extends Controller
                 'exception' => $e,
             ]);
 
-            return redirect()->route('create')
+            return redirect()->route('projects.index')
                 ->with('error', 'Payment processing failed. Please contact support.');
         }
     }
@@ -143,6 +146,13 @@ class PaymentGatewayController extends Controller
                     ->with('success', 'Plan updated successfully!');
             }
 
+            // Built-in manual checkout. This does not depend on a payment
+            // plugin: the purchase stays pending until an administrator
+            // confirms it from Transactions or Subscriptions.
+            if ($validated['gateway'] === Subscription::PAYMENT_MANUAL) {
+                return $this->handleManualPayment($user, $plan);
+            }
+
             // Regular payment gateway flow
             // Note: Old subscription is NOT cancelled here — webhook handlers cancel it
             // after payment succeeds, preventing loss of subscription if payment fails
@@ -176,6 +186,49 @@ class PaymentGatewayController extends Controller
 
             return back()->withErrors(['payment' => $e->getMessage()]);
         }
+    }
+
+    /**
+     * Create a plan purchase that must be confirmed by an administrator.
+     */
+    private function handleManualPayment($user, Plan $plan)
+    {
+        $reference = 'MAN-'.strtoupper(Str::random(10));
+
+        DB::transaction(function () use ($user, $plan, $reference) {
+            $subscription = Subscription::create([
+                'user_id' => $user->id,
+                'plan_id' => $plan->id,
+                'payment_method' => Subscription::PAYMENT_MANUAL,
+                'external_subscription_id' => $reference,
+                'status' => Subscription::STATUS_PENDING,
+                'amount' => round((float) $plan->price, 2),
+                'renewal_at' => $this->calculateRenewalDate($plan),
+                'metadata' => [
+                    'requires_manual_confirmation' => true,
+                ],
+            ]);
+
+            Transaction::create([
+                'user_id' => $user->id,
+                'subscription_id' => $subscription->id,
+                'amount' => round((float) $plan->price, 2),
+                'currency' => \App\Helpers\CurrencyHelper::getCode(),
+                'status' => Transaction::STATUS_PENDING,
+                'type' => Transaction::TYPE_SUBSCRIPTION_NEW,
+                'payment_method' => Transaction::PAYMENT_MANUAL,
+                'transaction_date' => now(),
+                'metadata' => [
+                    'requires_manual_confirmation' => true,
+                    'reference' => $reference,
+                    'plan_credits' => $plan->getMonthlyBuildCredits(),
+                ],
+                'notes' => 'Awaiting manual payment confirmation',
+            ]);
+        });
+
+        return redirect()->route('billing.index')
+            ->with('success', 'Purchase registered. Your plan and credits will be activated after an administrator confirms the payment.');
     }
 
     /**
@@ -237,11 +290,11 @@ class PaymentGatewayController extends Controller
     /**
      * Calculate renewal date based on plan billing period.
      */
-    private function calculateRenewalDate(Plan $plan): \Carbon\Carbon
+    private function calculateRenewalDate(Plan $plan): ?\Carbon\Carbon
     {
         return match ($plan->billing_period) {
             'yearly' => now()->addYear(),
-            'lifetime' => now()->addYears(100),
+            'lifetime' => null,
             default => now()->addMonth(),
         };
     }

@@ -22,6 +22,8 @@ class AiProviderFactory extends Factory
         $type = fake()->randomElement([
             AiProvider::TYPE_OPENAI,
             AiProvider::TYPE_ANTHROPIC,
+            AiProvider::TYPE_GEMINI,
+            AiProvider::TYPE_NVIDIA,
         ]);
 
         return [
@@ -114,6 +116,42 @@ class AiProviderFactory extends Factory
                 'summarizer_max_tokens' => 1500,
             ],
             'available_models' => AiProvider::DEFAULT_MODELS[AiProvider::TYPE_ZHIPU],
+        ]);
+    }
+
+    /**
+     * Create a Gemini provider.
+     */
+    public function gemini(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'name' => 'Gemini',
+            'type' => AiProvider::TYPE_GEMINI,
+            'config' => [
+                'base_url' => AiProvider::DEFAULT_BASE_URLS[AiProvider::TYPE_GEMINI],
+                'default_model' => 'gemini-3-flash-preview',
+                'max_tokens' => 8192,
+                'summarizer_max_tokens' => 1500,
+            ],
+            'available_models' => AiProvider::DEFAULT_MODELS[AiProvider::TYPE_GEMINI],
+        ]);
+    }
+
+    /**
+     * Create an NVIDIA NIM provider.
+     */
+    public function nvidia(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'name' => 'NVIDIA NIM',
+            'type' => AiProvider::TYPE_NVIDIA,
+            'config' => [
+                'base_url' => AiProvider::DEFAULT_BASE_URLS[AiProvider::TYPE_NVIDIA],
+                'default_model' => 'qwen/qwen3-coder-480b-a35b-instruct',
+                'max_tokens' => 8192,
+                'summarizer_max_tokens' => 1500,
+            ],
+            'available_models' => AiProvider::DEFAULT_MODELS[AiProvider::TYPE_NVIDIA],
         ]);
     }
 }

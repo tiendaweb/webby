@@ -29,23 +29,27 @@ class SentryReporterService
                 return;
             }
 
-            $purchaseCode = SystemSetting::get('purchase_code');
-            if (empty($purchaseCode)) {
-                return;
-            }
+            // DESHABILITADO: Purchase code requirement removed - error reporting disabled
+            // $purchaseCode = SystemSetting::get('purchase_code');
+            // if (empty($purchaseCode)) {
+            //     return;
+            // }
 
-            if ($this->shouldSkip($e)) {
-                return;
-            }
+            // Error reporting functionality has been disabled
+            return;
 
-            $payload = $this->buildPayload($e, $purchaseCode);
+            // if ($this->shouldSkip($e)) {
+            //     return;
+            // }
 
-            DB::table('sentry_pending_reports')->insert([
-                'payload' => json_encode($payload),
-                'attempts' => 0,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
+            // $payload = $this->buildPayload($e, $purchaseCode);
+
+            // DB::table('sentry_pending_reports')->insert([
+            //     'payload' => json_encode($payload),
+            //     'attempts' => 0,
+            //     'created_at' => now(),
+            //     'updated_at' => now(),
+            // ]);
         } catch (\Throwable) {
             // Silently ignore — cannot risk exception loops
         }
@@ -58,16 +62,23 @@ class SentryReporterService
      */
     public function flush(): array
     {
-        $enabled = SystemSetting::get('sentry_enabled', false);
-        $purchaseCode = SystemSetting::get('purchase_code');
+        // DESHABILITADO: Error reporting functionality has been disabled
+        // Clean up any stale buffer
+        $pruned = DB::table('sentry_pending_reports')->count();
+        DB::table('sentry_pending_reports')->delete();
 
-        // Clean up stale buffer when disabled or no purchase code
-        if (! $enabled || empty($purchaseCode)) {
-            $pruned = DB::table('sentry_pending_reports')->count();
-            DB::table('sentry_pending_reports')->delete();
+        return ['sent' => 0, 'failed' => 0, 'pruned' => $pruned];
 
-            return ['sent' => 0, 'failed' => 0, 'pruned' => $pruned];
-        }
+        // $enabled = SystemSetting::get('sentry_enabled', false);
+        // $purchaseCode = SystemSetting::get('purchase_code');
+
+        // // Clean up stale buffer when disabled or no purchase code
+        // if (! $enabled || empty($purchaseCode)) {
+        //     $pruned = DB::table('sentry_pending_reports')->count();
+        //     DB::table('sentry_pending_reports')->delete();
+
+        //     return ['sent' => 0, 'failed' => 0, 'pruned' => $pruned];
+        // }
 
         $reports = DB::table('sentry_pending_reports')
             ->orderBy('created_at')

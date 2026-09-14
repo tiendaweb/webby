@@ -47,6 +47,7 @@ class Plan extends Model
         'max_storage_mb',
         'max_file_size_mb',
         'allowed_file_types',
+        'enable_php_runtime',
     ];
 
     protected function casts(): array
@@ -71,6 +72,7 @@ class Plan extends Model
             'max_storage_mb' => 'integer',
             'max_file_size_mb' => 'integer',
             'allowed_file_types' => 'array',
+            'enable_php_runtime' => 'boolean',
         ];
     }
 
@@ -523,5 +525,13 @@ class Plan extends Model
         }
 
         return "{$mb} MB storage";
+    }
+
+    /**
+     * Check if plan allows executing uploaded PHP projects.
+     */
+    public function phpRuntimeEnabled(): bool
+    {
+        return $this->enable_php_runtime ?? true;
     }
 }

@@ -202,7 +202,7 @@ export default function Builders({ user, builders }: BuildersProps) {
                     max_iterations: 20,
                 });
                 setAddFormErrors({});
-                toast.success(t('Builder added successfully'));
+                toast.success(t('Assistant server added successfully'));
             },
             onError: (errors) => {
                 setAddFormErrors(errors as Record<string, string>);
@@ -245,7 +245,7 @@ export default function Builders({ user, builders }: BuildersProps) {
                 setIsEditDialogOpen(false);
                 setSelectedBuilder(null);
                 setEditFormErrors({});
-                toast.success(t('Builder updated successfully'));
+                toast.success(t('Assistant server updated successfully'));
             },
             onError: (errors) => {
                 setEditFormErrors(errors as Record<string, string>);
@@ -265,11 +265,11 @@ export default function Builders({ user, builders }: BuildersProps) {
             preserveState: true,
             preserveScroll: true,
             onSuccess: () => {
-                toast.success(t('Builder deleted'));
+                toast.success(t('Assistant server deleted'));
                 setIsDeleteDialogOpen(false);
                 setBuilderToDelete(null);
             },
-            onError: () => toast.error(t('Failed to delete builder')),
+            onError: () => toast.error(t('Failed to delete assistant server')),
         });
     }, [builderToDelete, t]);
 
@@ -407,14 +407,14 @@ export default function Builders({ user, builders }: BuildersProps) {
     ], [t, handleToggleStatus, openEditDialog, handleDelete, copyServerKey]);
 
     return (
-        <AdminLayout user={user} title={t('AI Builders')}>
+        <AdminLayout user={user} title={t('Assistant Servers')}>
             <AdminPageHeader
-                title={t('AI Builders')}
-                subtitle={t('Manage AI builder server instances')}
+                title={t('Assistant Servers')}
+                subtitle={t('Manage assistant server instances')}
                 action={
                     <Button onClick={() => setIsAddDialogOpen(true)}>
                         <Plus className="h-4 w-4 me-2" />
-                        {t('Add AI Builder')}
+                        {t('Add Assistant Server')}
                     </Button>
                 }
             />
@@ -430,7 +430,7 @@ export default function Builders({ user, builders }: BuildersProps) {
                     columns={columns}
                     data={builders}
                     searchKey="name"
-                    searchPlaceholder={t('Search builders...')}
+                    searchPlaceholder={t('Search assistant servers...')}
                 />
             )}
 
@@ -441,9 +441,9 @@ export default function Builders({ user, builders }: BuildersProps) {
             }}>
                 <DialogContent onPointerDownOutside={(e) => e.preventDefault()}>
                     <DialogHeader>
-                        <DialogTitle>{t('Add AI Builder')}</DialogTitle>
+                        <DialogTitle>{t('Add Assistant Server')}</DialogTitle>
                         <DialogDescription>
-                            {t('Add a new AI builder instance to the pool')}
+                            {t('Add a new assistant server to the pool')}
                         </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4 py-4">
@@ -451,7 +451,7 @@ export default function Builders({ user, builders }: BuildersProps) {
                             <Label htmlFor="add-name">{t('Name')}</Label>
                             <Input
                                 id="add-name"
-                                placeholder={t('Primary Builder')}
+                                placeholder={t('Primary Assistant Server')}
                                 value={addFormData.name}
                                 onChange={(e) => setAddFormData(prev => ({ ...prev, name: e.target.value }))}
                                 className={addFormErrors.name ? 'border-destructive' : ''}
@@ -533,7 +533,7 @@ export default function Builders({ user, builders }: BuildersProps) {
                         <Button type="button" variant="outline" onClick={() => setIsAddDialogOpen(false)}>
                             {t('Cancel')}
                         </Button>
-                        <Button type="button" onClick={handleAdd}>{t('Add AI Builder')}</Button>
+                        <Button type="button" onClick={handleAdd}>{t('Add Assistant Server')}</Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
@@ -545,9 +545,9 @@ export default function Builders({ user, builders }: BuildersProps) {
             }}>
                 <DialogContent onPointerDownOutside={(e) => e.preventDefault()}>
                     <DialogHeader>
-                        <DialogTitle>{t('Edit AI Builder')}</DialogTitle>
+                        <DialogTitle>{t('Edit Assistant Server')}</DialogTitle>
                         <DialogDescription>
-                            {t('Update AI builder configuration')}
+                            {t('Update assistant server configuration')}
                         </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4 py-4">
@@ -555,7 +555,7 @@ export default function Builders({ user, builders }: BuildersProps) {
                             <Label htmlFor="edit-name">{t('Name')}</Label>
                             <Input
                                 id="edit-name"
-                                placeholder={t('Primary Builder')}
+                                placeholder={t('Primary Assistant Server')}
                                 value={editFormData.name}
                                 onChange={(e) => setEditFormData(prev => ({ ...prev, name: e.target.value }))}
                                 className={editFormErrors.name ? 'border-destructive' : ''}
@@ -646,9 +646,9 @@ export default function Builders({ user, builders }: BuildersProps) {
             }}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
-                        <AlertDialogTitle>{t('Are you sure you want to delete this builder?')}</AlertDialogTitle>
+                        <AlertDialogTitle>{t('Are you sure you want to delete this assistant server?')}</AlertDialogTitle>
                         <AlertDialogDescription>
-                            {t('This action cannot be undone. This will permanently delete the builder configuration.')}
+                            {t('This action cannot be undone. This will permanently delete the assistant server configuration.')}
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>

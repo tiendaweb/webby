@@ -21,12 +21,18 @@ class AiProvider extends Model
 
     const TYPE_ZHIPU = 'zhipu';
 
+    const TYPE_GEMINI = 'gemini';
+
+    const TYPE_NVIDIA = 'nvidia';
+
     const TYPES = [
         self::TYPE_OPENAI => 'OpenAI',
         self::TYPE_ANTHROPIC => 'Anthropic',
         self::TYPE_GROK => 'Grok',
         self::TYPE_DEEPSEEK => 'DeepSeek',
         self::TYPE_ZHIPU => 'ZhipuAI',
+        self::TYPE_GEMINI => 'Gemini',
+        self::TYPE_NVIDIA => 'NVIDIA NIM',
     ];
 
     const DEFAULT_MODELS = [
@@ -47,6 +53,25 @@ class AiProvider extends Model
             'glm-5',
             'glm-4.7',
             'glm-4.5-air',
+        ],
+        self::TYPE_GEMINI => [
+            'gemini-3-flash-preview',
+            'gemini-3.1-flash-lite',
+            'gemini-3.1-pro-preview',
+            'gemini-2.5-pro',
+            'gemini-2.5-flash',
+            'gemini-2.5-flash-lite',
+        ],
+        self::TYPE_NVIDIA => [
+            'qwen/qwen3-coder-480b-a35b-instruct',
+            'openai/gpt-oss-120b',
+            'openai/gpt-oss-20b',
+            'deepseek-ai/deepseek-v4-flash',
+            'deepseek-ai/deepseek-v4-pro',
+            'moonshotai/kimi-k2-instruct',
+            'nvidia/llama-3.3-nemotron-super-49b-v1.5',
+            'nvidia/nemotron-3-nano-30b-a3b',
+            'meta/llama-3.3-70b-instruct',
         ],
     ];
 
@@ -80,6 +105,25 @@ class AiProvider extends Model
             'glm-4.7' => ['input' => 0, 'output' => 0],
             'glm-4.5-air' => ['input' => 0, 'output' => 0],
         ],
+        self::TYPE_GEMINI => [
+            'gemini-3-flash-preview' => ['input' => 0.50, 'output' => 3.00],
+            'gemini-3.1-flash-lite' => ['input' => 0.25, 'output' => 1.50],
+            'gemini-3.1-pro-preview' => ['input' => 2.00, 'output' => 12.00],
+            'gemini-2.5-pro' => ['input' => 1.25, 'output' => 10.00],
+            'gemini-2.5-flash' => ['input' => 0.30, 'output' => 2.50],
+            'gemini-2.5-flash-lite' => ['input' => 0.10, 'output' => 0.40],
+        ],
+        self::TYPE_NVIDIA => [
+            'qwen/qwen3-coder-480b-a35b-instruct' => ['input' => 0, 'output' => 0],
+            'openai/gpt-oss-120b' => ['input' => 0, 'output' => 0],
+            'openai/gpt-oss-20b' => ['input' => 0, 'output' => 0],
+            'deepseek-ai/deepseek-v4-flash' => ['input' => 0, 'output' => 0],
+            'deepseek-ai/deepseek-v4-pro' => ['input' => 0, 'output' => 0],
+            'moonshotai/kimi-k2-instruct' => ['input' => 0, 'output' => 0],
+            'nvidia/llama-3.3-nemotron-super-49b-v1.5' => ['input' => 0, 'output' => 0],
+            'nvidia/nemotron-3-nano-30b-a3b' => ['input' => 0, 'output' => 0],
+            'meta/llama-3.3-70b-instruct' => ['input' => 0, 'output' => 0],
+        ],
     ];
 
     /**
@@ -93,6 +137,8 @@ class AiProvider extends Model
         self::TYPE_GROK => 'https://api.x.ai/v1',
         self::TYPE_DEEPSEEK => 'https://api.deepseek.com',
         self::TYPE_ZHIPU => 'https://api.z.ai/api/anthropic',
+        self::TYPE_GEMINI => 'https://generativelanguage.googleapis.com/v1beta/openai',
+        self::TYPE_NVIDIA => 'https://integrate.api.nvidia.com/v1',
     ];
 
     protected $fillable = [
@@ -178,6 +224,8 @@ class AiProvider extends Model
         return $models[0] ?? match ($this->type) {
             self::TYPE_ANTHROPIC => 'claude-sonnet-4-5',
             self::TYPE_ZHIPU => 'glm-5',
+            self::TYPE_GEMINI => 'gemini-3-flash-preview',
+            self::TYPE_NVIDIA => 'qwen/qwen3-coder-480b-a35b-instruct',
             default => 'gpt-5.2',
         };
     }
@@ -213,6 +261,10 @@ class AiProvider extends Model
                     return $this->testDeepSeekConnection();
                 case self::TYPE_ZHIPU:
                     return $this->testZhipuConnection();
+                case self::TYPE_GEMINI:
+                    return $this->testGeminiConnection();
+                case self::TYPE_NVIDIA:
+                    return $this->testNvidiaConnection();
 
                 default:
                     return ['success' => false, 'message' => 'Unknown provider type'];
@@ -336,6 +388,48 @@ class AiProvider extends Model
     }
 
     /**
+     * Test Gemini through Google's OpenAI-compatible endpoint.
+     */
+    protected function testGeminiConnection(): array
+    {
+        $response = Http::withHeaders([
+            'Authorization' => 'Bearer '.$this->getApiKey(),
+        ])->post($this->getBaseUrl().'/chat/completions', [
+            'model' => $this->getDefaultModel(),
+            'max_tokens' => 1,
+            'messages' => [['role' => 'user', 'content' => 'Hi']],
+        ]);
+
+        if ($response->successful()) {
+            return ['success' => true, 'message' => 'Connection successful'];
+        }
+
+        return [
+            'success' => false,
+            'message' => $response->json('error.message', 'Connection failed'),
+        ];
+    }
+
+    /**
+     * Test NVIDIA NIM through its OpenAI-compatible models endpoint.
+     */
+    protected function testNvidiaConnection(): array
+    {
+        $response = Http::withHeaders([
+            'Authorization' => 'Bearer '.$this->getApiKey(),
+        ])->get($this->getBaseUrl().'/models');
+
+        if ($response->successful()) {
+            return ['success' => true, 'message' => 'Connection successful'];
+        }
+
+        return [
+            'success' => false,
+            'message' => $response->json('error.message', 'Connection failed'),
+        ];
+    }
+
+    /**
      * Increment the request counter and update last used timestamp.
      */
     public function recordUsage(): void
@@ -349,30 +443,43 @@ class AiProvider extends Model
      */
     public function toAiConfig(): array
     {
+        $transportType = self::transportTypeFor($this->type);
+
         return [
-            'provider' => $this->type,
-            'provider_type' => $this->type,
+            'provider' => $transportType,
+            'provider_type' => $transportType,
             'agent' => [
                 'api_key' => $this->getApiKey(),
                 'base_url' => $this->getBaseUrl(),
                 'model' => $this->getDefaultModel(),
                 'max_tokens' => $this->getMaxTokens(),
-                'provider_type' => $this->type,
+                'provider_type' => $transportType,
             ],
             'summarizer' => [
                 'api_key' => $this->getApiKey(),
                 'base_url' => $this->getBaseUrl(),
                 'model' => $this->getSummarizerModel(),
                 'max_tokens' => $this->getSummarizerMaxTokens(),
-                'provider_type' => $this->type,
+                'provider_type' => $transportType,
             ],
             'suggestions' => [
                 'api_key' => $this->getApiKey(),
                 'base_url' => $this->getBaseUrl(),
                 'model' => $this->getSuggestionsModel(),
-                'provider_type' => $this->type,
+                'provider_type' => $transportType,
             ],
         ];
+    }
+
+    /**
+     * Provider type understood by the builder transport layer.
+     */
+    public static function transportTypeFor(string $type): string
+    {
+        return match ($type) {
+            self::TYPE_GEMINI, self::TYPE_NVIDIA => self::TYPE_OPENAI,
+            default => $type,
+        };
     }
 
     /**
@@ -415,7 +522,11 @@ class AiProvider extends Model
      */
     public function getHasCredentialsAttribute(): bool
     {
-        return ! empty($this->credentials['api_key']);
+        try {
+            return ! empty($this->credentials['api_key']);
+        } catch (\Throwable) {
+            return false;
+        }
     }
 
     /**

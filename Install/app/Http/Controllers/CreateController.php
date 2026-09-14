@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Template;
 use App\Services\BroadcastService;
 use App\Services\InternalAiService;
+use App\Services\TemplateClassifierService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
@@ -14,7 +15,8 @@ class CreateController extends Controller
 {
     public function __construct(
         protected InternalAiService $internalAiService,
-        protected BroadcastService $broadcastService
+        protected BroadcastService $broadcastService,
+        protected TemplateClassifierService $templateClassifier
     ) {}
 
     public function index(Request $request): Response
@@ -43,11 +45,19 @@ class CreateController extends Controller
         // Check if broadcast credentials are configured (not connection test - that happens on start)
         $isBroadcastConfigured = $this->broadcastService->isConfigured();
 
-        // Block demo admin from creating projects
+        $canCreateProject = ! (config('app.demo') && Auth::id() === 1) && $user->canCreateMoreProjects();
+        $cannotCreateReason = null;
+        if (config('app.demo') && Auth::id() === 1) {
+            $cannotCreateReason = 'The demo admin account cannot create projects. Register your own account to test the hosting workspace.';
+        } elseif (! $canCreateProject) {
+            $cannotCreateReason = 'You have reached the maximum number of projects allowed by your plan.';
+        }
+
+        // Builder status only gates the optional AI assistant.
         if (config('app.demo') && Auth::id() === 1) {
             $canBuildResult = [
                 'allowed' => false,
-                'reason' => 'The demo admin account cannot create projects. Register your own account to test the AI website builder.',
+                'reason' => 'The demo admin account cannot use the AI assistant. Register your own account to test assisted editing.',
             ];
         } else {
             // Check build credit status for frontend
@@ -71,13 +81,34 @@ class CreateController extends Controller
             'sharedProjects' => $sharedProjects,
             'templates' => $templates,
             'isPusherConfigured' => $isBroadcastConfigured,
-            'canCreateProject' => $canBuildResult['allowed'],
-            'cannotCreateReason' => $canBuildResult['reason'],
+            'canCreateProject' => $canCreateProject,
+            'cannotCreateReason' => $cannotCreateReason,
+            'canUseAiAssistant' => $isBroadcastConfigured && ($canBuildResult['allowed'] ?? false),
+            'cannotUseAiReason' => $isBroadcastConfigured
+                ? ($canBuildResult['reason'] ?? null)
+                : 'The AI assistant is unavailable until broadcast settings are configured.',
+            'codeCanvasAvailable' => true,
             'suggestions' => InternalAiService::getStaticSuggestions($locale),
             'typingPrompts' => InternalAiService::getStaticTypingPrompts($locale),
             'greeting' => $greeting,
             'firstName' => $firstName,
         ]);
+    }
+
+    public function templateRecommendations(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $user = $request->user();
+
+        $validated = $request->validate([
+            'prompt' => 'required|string|max:2000',
+        ]);
+
+        return response()->json(
+            $this->templateClassifier->recommendTemplates(
+                $validated['prompt'],
+                $user?->getCurrentPlan(),
+            )
+        );
     }
 
     /**
@@ -97,7 +128,7 @@ class CreateController extends Controller
             $randomIndex = random_int(0, count($greetings) - 1);
             $greeting = str_replace('{name}', $firstName, $greetings[$randomIndex]);
         } else {
-            $greeting = "What do you want to build, {$firstName}?";
+            $greeting = "What site do you want to host, {$firstName}?";
         }
 
         return response()->json([

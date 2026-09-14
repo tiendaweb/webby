@@ -31,6 +31,10 @@ class Transaction extends Model
 
     public const TYPE_EXTENSION = 'extension';
 
+    public const TYPE_CONNECTOR_ACTIVATION = 'connector_activation';
+
+    public const TYPE_CONNECTOR_RENEWAL = 'connector_renewal';
+
     // Payment methods (mirrors Subscription constants)
     public const PAYMENT_PAYPAL = 'paypal';
 
@@ -53,6 +57,7 @@ class Transaction extends Model
         'external_transaction_id',
         'user_id',
         'subscription_id',
+        'ai_connector_activation_id',
         'amount',
         'currency',
         'status',
@@ -108,6 +113,11 @@ class Transaction extends Model
     public function subscription(): BelongsTo
     {
         return $this->belongsTo(Subscription::class);
+    }
+
+    public function connectorActivation(): BelongsTo
+    {
+        return $this->belongsTo(ProjectAiConnectorActivation::class, 'ai_connector_activation_id');
     }
 
     public function processedBy(): BelongsTo
@@ -275,6 +285,8 @@ class Transaction extends Model
             self::TYPE_REFUND => 'Refund',
             self::TYPE_ADJUSTMENT => 'Adjustment',
             self::TYPE_EXTENSION => 'Extension',
+            self::TYPE_CONNECTOR_ACTIVATION => 'AI Connector Activation',
+            self::TYPE_CONNECTOR_RENEWAL => 'AI Connector Renewal',
             default => ucfirst(str_replace('_', ' ', $this->type)),
         };
     }
@@ -366,6 +378,8 @@ class Transaction extends Model
             self::TYPE_REFUND,
             self::TYPE_ADJUSTMENT,
             self::TYPE_EXTENSION,
+            self::TYPE_CONNECTOR_ACTIVATION,
+            self::TYPE_CONNECTOR_RENEWAL,
         ];
     }
 }

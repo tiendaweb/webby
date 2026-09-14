@@ -21,6 +21,8 @@ class UserAiSettings extends Model
         'grok_api_key',
         'deepseek_api_key',
         'zhipu_api_key',
+        'gemini_api_key',
+        'nvidia_api_key',
         'sounds_enabled',
         'sound_style',
         'sound_volume',
@@ -32,6 +34,8 @@ class UserAiSettings extends Model
         'grok_api_key' => 'encrypted',
         'deepseek_api_key' => 'encrypted',
         'zhipu_api_key' => 'encrypted',
+        'gemini_api_key' => 'encrypted',
+        'nvidia_api_key' => 'encrypted',
         'sounds_enabled' => 'boolean',
         'sound_volume' => 'integer',
     ];
@@ -42,6 +46,8 @@ class UserAiSettings extends Model
         'grok_api_key',
         'deepseek_api_key',
         'zhipu_api_key',
+        'gemini_api_key',
+        'nvidia_api_key',
     ];
 
     public function user(): BelongsTo
@@ -60,6 +66,8 @@ class UserAiSettings extends Model
             'grok' => ! empty($this->grok_api_key),
             'deepseek' => ! empty($this->deepseek_api_key),
             'zhipu' => ! empty($this->zhipu_api_key),
+            'gemini' => ! empty($this->gemini_api_key),
+            'nvidia' => ! empty($this->nvidia_api_key),
             default => false,
         };
     }
@@ -75,6 +83,8 @@ class UserAiSettings extends Model
             'grok' => $this->grok_api_key,
             'deepseek' => $this->deepseek_api_key,
             'zhipu' => $this->zhipu_api_key,
+            'gemini' => $this->gemini_api_key,
+            'nvidia' => $this->nvidia_api_key,
             default => null,
         };
     }
@@ -88,7 +98,9 @@ class UserAiSettings extends Model
             || $this->hasApiKeyFor('anthropic')
             || $this->hasApiKeyFor('grok')
             || $this->hasApiKeyFor('deepseek')
-            || $this->hasApiKeyFor('zhipu');
+            || $this->hasApiKeyFor('zhipu')
+            || $this->hasApiKeyFor('gemini')
+            || $this->hasApiKeyFor('nvidia');
     }
 
     /**

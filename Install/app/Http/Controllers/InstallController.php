@@ -102,7 +102,7 @@ class InstallController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255'],
             'password' => ['required', 'confirmed', Password::defaults()],
-            'purchase_code' => ['nullable', 'string', 'max:255'],
+            // DESHABILITADO: 'purchase_code' => ['nullable', 'string', 'max:255'],
         ]);
 
         try {

@@ -32,7 +32,7 @@ export function PendingEditsPanel({
             <div className="px-4 py-2 border-b border-border flex items-center justify-between bg-card">
                 <div className="flex items-center gap-2">
                     <span className="font-medium text-sm text-foreground">
-                        {t(':count pending changes', { count: edits.length })}
+                        {t(':count pending visual changes', { count: edits.length })}
                     </span>
                 </div>
                 <div className="flex items-center gap-2">

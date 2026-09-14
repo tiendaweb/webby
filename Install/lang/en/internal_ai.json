@@ -1,36 +1,36 @@
 {
     "suggestions": {
-        "1": "Build a task management app",
-        "2": "Create a portfolio website",
-        "3": "Design a landing page",
-        "4": "Make an e-commerce store"
+        "1": "Host a portfolio website",
+        "2": "Import an existing landing page",
+        "3": "Publish a PHP contact site",
+        "4": "Edit a React marketing site"
     },
     "typing_prompts": {
-        "1": "Build me a modern portfolio website with dark mode...",
-        "2": "Create a task management app with drag and drop...",
-        "3": "Design a landing page for my SaaS startup...",
-        "4": "Make an e-commerce store with cart functionality...",
-        "5": "Build a blog platform with markdown support...",
-        "6": "Create a dashboard for tracking analytics...",
-        "7": "Design a booking system for appointments...",
-        "8": "Build a social media feed with infinite scroll..."
+        "1": "Upload and host my portfolio website...",
+        "2": "Import this landing page and make it responsive...",
+        "3": "Create a static site from this HTML...",
+        "4": "Publish a PHP contact page with clean styling...",
+        "5": "Edit the existing homepage copy and colors...",
+        "6": "Turn this Vite app into a hosted site...",
+        "7": "Prepare a product page for publishing...",
+        "8": "Review this project before publishing..."
     },
     "greetings": {
-        "1": "What do you want to build, {name}?",
-        "2": "What should we build, {name}?",
-        "3": "What would you like to create, {name}?",
-        "4": "What can I help you build, {name}?"
+        "1": "What site do you want to host, {name}?",
+        "2": "What should we publish, {name}?",
+        "3": "What would you like to edit, {name}?",
+        "4": "What site can I help you manage, {name}?"
     },
     "hero_headlines": {
-        "1": "What will you build today?",
-        "2": "What will you create today?",
-        "3": "Build something amazing today",
-        "4": "Turn your ideas into reality"
+        "1": "Host and edit your sites in one place",
+        "2": "Publish your website workspace today",
+        "3": "Live editing for hosted websites",
+        "4": "Bring existing sites under control"
     },
     "hero_subtitles": {
-        "1": "Create stunning websites by chatting with AI.",
-        "2": "Turn your ideas into websites with AI.",
-        "3": "Build beautiful websites through conversation.",
-        "4": "Describe your vision and watch it come to life."
+        "1": "Import, edit, preview, and publish static or PHP sites.",
+        "2": "Use the visual editor, code editor, and optional AI assistant together.",
+        "3": "Manage hosted files, domains, previews, and revisions from one workspace.",
+        "4": "Edit existing code live and publish when it is ready."
     }
 }

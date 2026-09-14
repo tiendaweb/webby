@@ -45,9 +45,16 @@ export function MessageList({ messages, thinkingDuration }: MessageListProps) {
         );
     }
 
-    // Filter messages to show user, assistant, and activity types
+    // Show the builder lane (user/assistant/activity) and the connector
+    // lane (note/noteResult) in the same thread — they are one conversation
+    // from the owner's point of view, just answered by different things.
     const filteredMessages = messages.filter(
-        msg => msg.type === 'user' || msg.type === 'assistant' || msg.type === 'activity'
+        msg =>
+            msg.type === 'user' ||
+            msg.type === 'assistant' ||
+            msg.type === 'activity' ||
+            msg.type === 'note' ||
+            msg.type === 'noteResult'
     );
 
     return (

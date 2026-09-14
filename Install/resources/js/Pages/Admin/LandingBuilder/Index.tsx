@@ -1,4 +1,6 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
+import MonacoEditor from '@monaco-editor/react';
+import { useTheme } from '@/contexts/ThemeContext';
 import { Head, Link, router } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -6,6 +8,7 @@ import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
 import { ImageUploadField } from './ImageUploadField';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { LanguageSelector } from '@/components/LanguageSelector';
@@ -15,7 +18,7 @@ import { toast } from 'sonner';
 import { Toaster } from '@/components/ui/sonner';
 import { useTranslation } from '@/contexts/LanguageContext';
 import type { PageProps } from '@/types';
-import type { Section, SectionType, LandingBuilderProps, SectionItem } from './types';
+import type { Section, SectionType, LandingBuilderProps, SectionItem, LandingPageData } from './types';
 import {
     DndContext,
     closestCenter,
@@ -69,6 +72,15 @@ import {
     Bot,
     Info,
     Loader2,
+    FileText,
+    CheckCircle2,
+    Circle,
+    ArrowLeft,
+    Link2,
+    ToggleLeft,
+    ToggleRight,
+    Pencil,
+    Code2,
 } from 'lucide-react';
 // Generate a UUID-like random string
 function generateId(): string {
@@ -94,6 +106,7 @@ const SECTION_ICONS: Record<string, React.ElementType> = {
     testimonials: MessageSquare,
     faq: HelpCircle,
     cta: Megaphone,
+    html_block: Code2,
 };
 
 // Sortable Section Card Component
@@ -103,6 +116,7 @@ interface SortableSectionCardProps {
     isSelected: boolean;
     onSelect: () => void;
     onToggle: (enabled: boolean) => void;
+    onDelete?: () => void;
     t: (key: string) => string;
 }
 
@@ -112,6 +126,7 @@ function SortableSectionCard({
     isSelected,
     onSelect,
     onToggle,
+    onDelete,
     t,
 }: SortableSectionCardProps) {
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -156,11 +171,21 @@ function SortableSectionCard({
                 </p>
             </div>
 
-            <Switch
-                checked={section.is_enabled}
-                onCheckedChange={onToggle}
-                onClick={(e) => e.stopPropagation()}
-            />
+            {onDelete ? (
+                <button
+                    className="text-muted-foreground hover:text-destructive transition-colors"
+                    onClick={(e) => { e.stopPropagation(); onDelete(); }}
+                    title={t('Delete')}
+                >
+                    <Trash2 className="h-4 w-4" />
+                </button>
+            ) : (
+                <Switch
+                    checked={section.is_enabled}
+                    onCheckedChange={onToggle}
+                    onClick={(e) => e.stopPropagation()}
+                />
+            )}
         </div>
     );
 }
@@ -775,14 +800,309 @@ function getItemTitle(item: SectionItem, itemType: string, t: (key: string) => s
     }
 }
 
+// ─── Pages Panel Component ────────────────────────────────────────────────────
+interface PagesPanelProps {
+    pages: LandingPageData[];
+    currentPage: LandingPageData | null;
+    presets: Record<string, { label: string; description: string }>;
+    onClose: () => void;
+    t: (key: string) => string;
+}
+
+function PagesPanel({ pages, currentPage, presets, onClose, t }: PagesPanelProps) {
+    const [showCreateForm, setShowCreateForm] = useState(false);
+    const [editingPage, setEditingPage] = useState<LandingPageData | null>(null);
+    const [form, setForm] = useState({ name: '', slug: '', type: 'sections' as 'sections' | 'html_code', preset: 'default', meta_title: '', meta_description: '' });
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
+    const openCreate = () => {
+        setForm({ name: '', slug: '', type: 'sections', preset: 'default', meta_title: '', meta_description: '' });
+        setEditingPage(null);
+        setShowCreateForm(true);
+    };
+
+    const openEdit = (page: LandingPageData) => {
+        setForm({
+            name: page.name,
+            slug: page.slug,
+            type: page.type,
+            preset: 'default',
+            meta_title: page.meta_title || '',
+            meta_description: page.meta_description || '',
+        });
+        setEditingPage(page);
+        setShowCreateForm(true);
+    };
+
+    const handleSubmit = () => {
+        if (!form.name || !form.slug) {
+            toast.error(t('Name and slug are required'));
+            return;
+        }
+        setIsSubmitting(true);
+        const payload = form.type === 'sections' ? form : { ...form, preset: undefined };
+
+        if (editingPage) {
+            router.put(`/admin/landing-builder/pages/${editingPage.id}`, payload, {
+                preserveScroll: true,
+                onSuccess: () => {
+                    toast.success(t('Landing page updated successfully.'));
+                    setShowCreateForm(false);
+                    setIsSubmitting(false);
+                },
+                onError: (errors) => {
+                    toast.error(Object.values(errors)[0] as string || t('Failed to update page'));
+                    setIsSubmitting(false);
+                },
+            });
+        } else {
+            router.post('/admin/landing-builder/pages', payload, {
+                preserveScroll: false,
+                onSuccess: () => {
+                    toast.success(t('Landing page created successfully.'));
+                    setShowCreateForm(false);
+                    setIsSubmitting(false);
+                },
+                onError: (errors) => {
+                    toast.error(Object.values(errors)[0] as string || t('Failed to create page'));
+                    setIsSubmitting(false);
+                },
+            });
+        }
+    };
+
+    const handleSetHome = (page: LandingPageData) => {
+        router.post(`/admin/landing-builder/pages/${page.id}/set-home`, {}, {
+            preserveScroll: true,
+            onSuccess: () => toast.success(t('Home page updated.')),
+            onError: () => toast.error(t('Failed to update home page')),
+        });
+    };
+
+    const handleToggleActive = (page: LandingPageData) => {
+        router.post(`/admin/landing-builder/pages/${page.id}/toggle-active`, {}, {
+            preserveScroll: true,
+            onSuccess: () => toast.success(page.is_active ? t('Page deactivated') : t('Page activated')),
+            onError: () => toast.error(t('Failed to toggle page status')),
+        });
+    };
+
+    const handleDelete = (page: LandingPageData) => {
+        if (!confirm(t('Delete this landing page? All sections and content will be lost.'))) return;
+        router.delete(`/admin/landing-builder/pages/${page.id}`, {
+            onSuccess: () => toast.success(t('Landing page deleted.')),
+            onError: (errors) => toast.error(Object.values(errors)[0] as string || t('Failed to delete page')),
+        });
+    };
+
+    const handleSelectPage = (page: LandingPageData) => {
+        router.get(`/admin/landing-builder`, { page: page.id }, { preserveState: false });
+    };
+
+    return (
+        <div className="flex flex-col h-full">
+            <div className="h-14 px-4 border-b flex items-center justify-between shrink-0">
+                <div className="flex items-center gap-2">
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onClose}>
+                        <ArrowLeft className="h-4 w-4" />
+                    </Button>
+                    <span className="font-semibold">{t('Landing Pages')}</span>
+                </div>
+                <Button size="sm" onClick={openCreate}>
+                    <Plus className="h-4 w-4 me-1" />
+                    {t('New Page')}
+                </Button>
+            </div>
+
+            {showCreateForm ? (
+                <div className="p-4 space-y-4 flex-1 overflow-auto">
+                    <h3 className="font-semibold text-sm">{editingPage ? t('Edit Page') : t('Create Landing Page')}</h3>
+                    <div className="space-y-3">
+                        <div className="space-y-1.5">
+                            <Label>{t('Name')} *</Label>
+                            <Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="AAPP PRO" />
+                        </div>
+                        <div className="space-y-1.5">
+                            <Label>{t('Slug')} *</Label>
+                            <div className="relative">
+                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">/</span>
+                                <Input
+                                    className="pl-6"
+                                    value={form.slug}
+                                    onChange={e => setForm(f => ({ ...f, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-') }))}
+                                    placeholder="aapp-pro"
+                                />
+                            </div>
+                            <p className="text-xs text-muted-foreground">{t('Lowercase letters, numbers and hyphens only')}</p>
+                        </div>
+                        {!editingPage && (
+                            <div className="space-y-1.5">
+                                <Label>{t('Page Type')}</Label>
+                                <Select value={form.type} onValueChange={v => setForm(f => ({ ...f, type: v as 'sections' | 'html_code' }))}>
+                                    <SelectTrigger>
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="sections">{t('Section Builder')}</SelectItem>
+                                        <SelectItem value="html_code">{t('Custom HTML Page')}</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                                <p className="text-xs text-muted-foreground">
+                                    {form.type === 'html_code' ? t('Write custom HTML/CSS code for this page') : t('Build with drag-and-drop sections')}
+                                </p>
+                            </div>
+                        )}
+                        <div className="space-y-1.5">
+                            <Label>{t('Meta Title')}</Label>
+                            <Input value={form.meta_title} onChange={e => setForm(f => ({ ...f, meta_title: e.target.value }))} />
+                        </div>
+                        <div className="space-y-1.5">
+                            <Label>{t('Meta Description')}</Label>
+                            <Textarea value={form.meta_description} onChange={e => setForm(f => ({ ...f, meta_description: e.target.value }))} rows={2} />
+                        </div>
+                        {!editingPage && form.type === 'sections' && (
+                            <div className="space-y-1.5">
+                                <Label>{t('Starter Preset')}</Label>
+                                <Select value={form.preset} onValueChange={(v) => setForm(f => ({ ...f, preset: v }))}>
+                                    <SelectTrigger>
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {Object.entries(presets).map(([key, preset]) => (
+                                            <SelectItem key={key} value={key}>
+                                                <div className="flex flex-col items-start">
+                                                    <span>{preset.label}</span>
+                                                    <span className="text-xs text-muted-foreground">{preset.description}</span>
+                                                </div>
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <p className="text-xs text-muted-foreground">
+                                    {t('Use a prepared section layout as the starting point.')}
+                                </p>
+                            </div>
+                        )}
+                    </div>
+                    <div className="flex gap-2 pt-2">
+                        <Button onClick={handleSubmit} disabled={isSubmitting} className="flex-1">
+                            {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin me-1" /> : <Save className="h-4 w-4 me-1" />}
+                            {editingPage ? t('Update') : t('Create')}
+                        </Button>
+                        <Button variant="outline" onClick={() => setShowCreateForm(false)}>{t('Cancel')}</Button>
+                    </div>
+                </div>
+            ) : (
+                <ScrollArea className="flex-1">
+                    <div className="p-4 space-y-2">
+                        {pages.map(page => (
+                            <div
+                                key={page.id}
+                                className={`border rounded-lg p-3 space-y-2 transition-colors ${
+                                    currentPage?.id === page.id ? 'border-primary bg-primary/5' : 'hover:border-primary/40'
+                                }`}
+                            >
+                                <div className="flex items-start gap-2">
+                                    {page.type === 'html_code'
+                                        ? <Code2 className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+                                        : <FileText className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+                                    }
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                            <span className="text-sm font-medium">{page.name}</span>
+                                            {page.is_home && <Badge variant="default" className="text-xs h-4 px-1">Home</Badge>}
+                                            {page.type === 'html_code' && <Badge variant="outline" className="text-xs h-4 px-1">HTML</Badge>}
+                                            {!page.is_active && <Badge variant="secondary" className="text-xs h-4 px-1">{t('Inactive')}</Badge>}
+                                        </div>
+                                        <p className="text-xs text-muted-foreground">/{page.slug}</p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-1 flex-wrap">
+                                    <Button
+                                        size="sm"
+                                        variant={currentPage?.id === page.id ? 'default' : 'outline'}
+                                        className="h-6 text-xs px-2"
+                                        onClick={() => handleSelectPage(page)}
+                                    >
+                                        {page.type === 'html_code' ? t('Edit code') : t('Edit sections')}
+                                    </Button>
+                                    <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        className="h-6 text-xs px-2"
+                                        onClick={() => openEdit(page)}
+                                    >
+                                        <Pencil className="h-3 w-3" />
+                                    </Button>
+                                    {!page.is_home && (
+                                        <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            className="h-6 text-xs px-2"
+                                            title={t('Set as home page')}
+                                            onClick={() => handleSetHome(page)}
+                                        >
+                                            <Home className="h-3 w-3" />
+                                        </Button>
+                                    )}
+                                    <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        className="h-6 text-xs px-2"
+                                        title={page.is_active ? t('Deactivate') : t('Activate')}
+                                        onClick={() => handleToggleActive(page)}
+                                    >
+                                        {page.is_active
+                                            ? <ToggleRight className="h-3 w-3 text-green-500" />
+                                            : <ToggleLeft className="h-3 w-3 text-muted-foreground" />
+                                        }
+                                    </Button>
+                                    {!page.is_home && (
+                                        <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            className="h-6 text-xs px-2 text-destructive hover:text-destructive"
+                                            onClick={() => handleDelete(page)}
+                                        >
+                                            <Trash2 className="h-3 w-3" />
+                                        </Button>
+                                    )}
+                                    <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        className="h-6 text-xs px-2"
+                                        asChild
+                                    >
+                                        <a href={`/${page.slug}`} target="_blank" rel="noreferrer">
+                                            <Link2 className="h-3 w-3" />
+                                        </a>
+                                    </Button>
+                                </div>
+                            </div>
+                        ))}
+                        {pages.length === 0 && (
+                            <div className="text-center py-8 text-muted-foreground text-sm">{t('No landing pages yet.')}</div>
+                        )}
+                    </div>
+                </ScrollArea>
+            )}
+        </div>
+    );
+}
+
 // Main Component
 export default function Index({
+    pages,
+    currentPage,
     sections: initialSections,
     sectionTypes,
+    presets,
     languages,
     defaultLanguage,
+    htmlCode: initialHtmlCode,
 }: LandingBuilderPageProps) {
     const { t } = useTranslation();
+    const { resolvedTheme } = useTheme();
     const [sections, setSections] = useState<Section[]>(initialSections);
     const [selectedSection, setSelectedSection] = useState<Section | null>(
         initialSections[0] || null
@@ -790,9 +1110,18 @@ export default function Index({
     const [selectedLocale, setSelectedLocale] = useState(defaultLanguage);
     const [activeTab, setActiveTab] = useState<'settings' | 'preview'>('settings');
     const [isSaving, setIsSaving] = useState(false);
+    const [isHtmlSaving, setIsHtmlSaving] = useState(false);
+    const [htmlCodeValue, setHtmlCodeValue] = useState<string>(initialHtmlCode ?? '');
     const [previewKey, setPreviewKey] = useState(Date.now());
+    const [isAddingBlock, setIsAddingBlock] = useState(false);
+    const [aiPrompt, setAiPrompt] = useState('');
+    const [aiPanelOpen, setAiPanelOpen] = useState(false);
+    const [aiGenerating, setAiGenerating] = useState(false);
+    const [aiResult, setAiResult] = useState<string | null>(null);
     const [initialLoading, setInitialLoading] = useState(true);
     const [previewLoading, setPreviewLoading] = useState(false);
+    const [showPagesPanel, setShowPagesPanel] = useState(false);
+    const isHtmlPage = currentPage?.type === 'html_code';
 
     // Clear initial loading state after first render
     useEffect(() => {
@@ -996,6 +1325,101 @@ export default function Index({
         setPreviewKey(Date.now());
     }, []);
 
+    const handleSaveHtmlCode = useCallback(async () => {
+        if (!currentPage) return;
+        setIsHtmlSaving(true);
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+        try {
+            const response = await fetch(`/admin/landing-builder/pages/${currentPage.id}/code`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken,
+                    'Accept': 'application/json',
+                },
+                body: JSON.stringify({ html_code: htmlCodeValue }),
+            });
+            if (!response.ok) throw new Error();
+            toast.success(t('HTML code saved successfully.'));
+        } catch {
+            toast.error(t('Failed to save HTML code'));
+        } finally {
+            setIsHtmlSaving(false);
+        }
+    }, [currentPage, htmlCodeValue, t]);
+
+    const handleAddHtmlBlock = useCallback(async () => {
+        if (!currentPage) return;
+        setIsAddingBlock(true);
+        const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+        try {
+            const resp = await fetch(`/admin/landing-builder/pages/${currentPage.id}/sections`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf, 'Accept': 'application/json' },
+            });
+            const data = await resp.json();
+            if (data.success) {
+                setSections((prev) => [...prev, data.section]);
+                setSelectedSection(data.section);
+                setAiPanelOpen(false);
+                setAiResult(null);
+                setAiPrompt('');
+                toast.success(t('HTML block added'));
+            } else {
+                toast.error(data.error || t('Failed to add block'));
+            }
+        } catch {
+            toast.error(t('Failed to add block'));
+        } finally {
+            setIsAddingBlock(false);
+        }
+    }, [currentPage, t]);
+
+    const handleDeleteHtmlBlock = useCallback(async (sectionId: number) => {
+        if (!confirm(t('Delete this HTML block? This cannot be undone.'))) return;
+        const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+        try {
+            const resp = await fetch(`/admin/landing-builder/sections/${sectionId}`, {
+                method: 'DELETE',
+                headers: { 'X-CSRF-TOKEN': csrf, 'Accept': 'application/json' },
+            });
+            const data = await resp.json();
+            if (data.success) {
+                setSections((prev) => prev.filter((s) => s.id !== sectionId));
+                setSelectedSection((prev) => (prev?.id === sectionId ? null : prev));
+                toast.success(t('Block deleted'));
+            } else {
+                toast.error(data.error || t('Failed to delete block'));
+            }
+        } catch {
+            toast.error(t('Failed to delete block'));
+        }
+    }, [t]);
+
+    const handleGenerateHtml = useCallback(async () => {
+        if (!aiPrompt.trim()) return;
+        setAiGenerating(true);
+        setAiResult(null);
+        const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+        try {
+            const resp = await fetch('/admin/landing-builder/generate-html', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf, 'Accept': 'application/json' },
+                body: JSON.stringify({ prompt: aiPrompt, locale: selectedLocale }),
+            });
+            const data = await resp.json();
+            if (data.success) {
+                setAiResult(data.html);
+            } else {
+                toast.error(data.error || t('Failed to generate HTML'));
+            }
+        } catch {
+            toast.error(t('Failed to generate HTML'));
+        } finally {
+            setAiGenerating(false);
+        }
+    }, [aiPrompt, selectedLocale, t]);
+
     const getTabButtonClass = (tab: 'settings' | 'preview') =>
         `flex items-center gap-2 px-4 py-2 text-sm font-medium transition-all ${
             activeTab === tab
@@ -1019,11 +1443,37 @@ export default function Index({
             <Toaster />
 
             <div className="h-screen flex bg-background text-foreground">
-                {/* LEFT PANEL - Section List */}
+                {/* LEFT PANEL - Section List / Pages Panel */}
                 <div className="w-full md:w-[420px] shrink-0 md:border-e flex flex-col">
+                    {showPagesPanel ? (
+                        <PagesPanel
+                            pages={pages}
+                            currentPage={currentPage}
+                            presets={presets}
+                            onClose={() => setShowPagesPanel(false)}
+                            t={t}
+                        />
+                    ) : (
+                    <>
                     {/* Header */}
                     <div className="h-14 px-4 border-b flex items-center justify-between shrink-0">
-                        <span className="font-semibold truncate">{t('Landing Page Builder')}</span>
+                        <div className="flex items-center gap-2 min-w-0">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-7 text-xs shrink-0"
+                                onClick={() => setShowPagesPanel(true)}
+                            >
+                                <FileText className="h-3 w-3 me-1" />
+                                {t('Pages')}
+                            </Button>
+                            {currentPage && (
+                                <span className="text-xs text-muted-foreground truncate">
+                                    {currentPage.name}
+                                    {currentPage.is_home && <span className="text-primary ml-1">●</span>}
+                                </span>
+                            )}
+                        </div>
                         <div className="flex items-center gap-1">
                             <LanguageSelector />
                             <ThemeToggle />
@@ -1035,7 +1485,29 @@ export default function Index({
                         </div>
                     </div>
 
-                    {/* Section List */}
+                    {/* Section List or HTML info */}
+                    {isHtmlPage ? (
+                        <div className="flex-1 flex flex-col items-center justify-center p-6 text-center gap-3">
+                            <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                                <Code2 className="h-6 w-6 text-primary" />
+                            </div>
+                            <div>
+                                <p className="font-medium text-sm">{t('Custom HTML Page')}</p>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                    {t('Edit the HTML code in the editor on the right.')}
+                                </p>
+                            </div>
+                            <a
+                                href={`/${currentPage?.slug}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-xs text-primary underline-offset-2 hover:underline flex items-center gap-1"
+                            >
+                                <ExternalLink className="h-3 w-3" />
+                                /{currentPage?.slug}
+                            </a>
+                        </div>
+                    ) : (
                     <ScrollArea className="flex-1">
                         <div className="p-4 space-y-2">
                             <DndContext
@@ -1051,17 +1523,39 @@ export default function Index({
                                         <SortableSectionCard
                                             key={section.id}
                                             section={section}
-                                            sectionType={sectionTypes[section.type]}
+                                            sectionType={sectionTypes[section.type] || { name: 'HTML Block', icon: 'Code2', description: '', has_items: false, content_fields: ['html_code'] }}
                                             isSelected={selectedSection?.id === section.id}
-                                            onSelect={() => setSelectedSection(section)}
+                                            onSelect={() => {
+                                                setSelectedSection(section);
+                                                setAiPanelOpen(false);
+                                                setAiResult(null);
+                                                setAiPrompt('');
+                                            }}
                                             onToggle={(enabled) => handleToggleSection(section, enabled)}
+                                            onDelete={section.type === 'html_block' ? () => handleDeleteHtmlBlock(section.id) : undefined}
                                             t={t}
                                         />
                                     ))}
                                 </SortableContext>
                             </DndContext>
+
+                            <div className="pt-2">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="w-full border-dashed text-muted-foreground hover:text-foreground"
+                                    onClick={handleAddHtmlBlock}
+                                    disabled={isAddingBlock}
+                                >
+                                    {isAddingBlock ? <Loader2 className="h-4 w-4 me-1.5 animate-spin" /> : <Plus className="h-4 w-4 me-1.5" />}
+                                    {t('Add HTML Block')}
+                                </Button>
+                            </div>
                         </div>
                     </ScrollArea>
+                    )}
+                    </>
+                    )}
                 </div>
 
                 {/* RIGHT PANEL - Editor/Preview/Settings */}
@@ -1110,10 +1604,17 @@ export default function Index({
                                     ))}
                                 </SelectContent>
                             </Select>
-                            <Button size="sm" onClick={handleSave} disabled={isSaving} className="h-8">
-                                <Save className="h-4 w-4 me-1.5" />
-                                {isSaving ? t('Saving...') : t('Save')}
-                            </Button>
+                            {isHtmlPage ? (
+                                <Button size="sm" onClick={handleSaveHtmlCode} disabled={isHtmlSaving} className="h-8">
+                                    <Save className="h-4 w-4 me-1.5" />
+                                    {isHtmlSaving ? t('Saving...') : t('Save HTML')}
+                                </Button>
+                            ) : (
+                                <Button size="sm" onClick={handleSave} disabled={isSaving} className="h-8">
+                                    <Save className="h-4 w-4 me-1.5" />
+                                    {isSaving ? t('Saving...') : t('Save')}
+                                </Button>
+                            )}
                             {activeTab === 'preview' && (
                                 <>
                                     <Button variant="outline" size="sm" onClick={refreshPreview} className="h-8">
@@ -1125,7 +1626,7 @@ export default function Index({
                                         size="sm"
                                         onClick={() =>
                                             window.open(
-                                                `/admin/landing-builder/preview?locale=${selectedLocale}`,
+                                                `/admin/landing-builder/preview?locale=${selectedLocale}${currentPage ? `&page=${currentPage.id}` : ''}`,
                                                 '_blank'
                                             )
                                         }
@@ -1143,8 +1644,90 @@ export default function Index({
                     <div className="flex-1 overflow-hidden relative bg-background">
                         <GradientBackground />
 
+                        {/* HTML Block Editor */}
+                        {activeTab === 'settings' && selectedSection?.type === 'html_block' && !isHtmlPage && (
+                            <div className="h-full flex flex-col relative z-10 bg-background">
+                                {/* AI Prompt Panel */}
+                                <div className="border-b shrink-0">
+                                    <div className="px-4 py-2 flex items-center gap-2">
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="h-7 gap-1.5 text-xs"
+                                            onClick={() => { setAiPanelOpen((v) => !v); setAiResult(null); }}
+                                        >
+                                            <Bot className="h-3.5 w-3.5" />
+                                            {t('Generate with AI')}
+                                            {aiPanelOpen ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                                        </Button>
+                                        <span className="text-xs text-muted-foreground">{t('HTML Block')}</span>
+                                    </div>
+
+                                    {aiPanelOpen && (
+                                        <div className="px-4 pb-3 space-y-2">
+                                            <div className="flex gap-2">
+                                                <Textarea
+                                                    value={aiPrompt}
+                                                    onChange={(e) => setAiPrompt(e.target.value)}
+                                                    placeholder={t('Describe the section you want to generate (e.g. "Contact form with name, email and message fields")')}
+                                                    rows={2}
+                                                    className="flex-1 text-sm resize-none"
+                                                />
+                                                <Button
+                                                    size="sm"
+                                                    onClick={handleGenerateHtml}
+                                                    disabled={aiGenerating || !aiPrompt.trim()}
+                                                    className="shrink-0"
+                                                >
+                                                    {aiGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                                                </Button>
+                                            </div>
+                                            {aiResult && (
+                                                <div className="flex items-center gap-2 p-2 rounded-md bg-green-500/10 border border-green-500/20">
+                                                    <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
+                                                    <span className="text-xs text-green-600 dark:text-green-400 flex-1">{t('HTML generated. Click "Use this" to apply it to the editor.')}</span>
+                                                    <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        className="h-6 text-xs px-2 shrink-0"
+                                                        onClick={() => {
+                                                            handleContentUpdate({ ...(selectedSection.content[selectedLocale] || {}), html_code: aiResult });
+                                                            setAiResult(null);
+                                                            setAiPanelOpen(false);
+                                                            toast.success(t('HTML applied to editor'));
+                                                        }}
+                                                    >
+                                                        {t('Use this')}
+                                                    </Button>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Monaco Editor for html_code */}
+                                <div className="flex-1">
+                                    <MonacoEditor
+                                        height="100%"
+                                        language="html"
+                                        value={(selectedSection.content[selectedLocale]?.html_code as string) ?? (selectedSection.content['en']?.html_code as string) ?? ''}
+                                        onChange={(value) => handleContentUpdate({ ...(selectedSection.content[selectedLocale] || {}), html_code: value ?? '' })}
+                                        theme={resolvedTheme === 'dark' ? 'vs-dark' : 'light'}
+                                        options={{
+                                            minimap: { enabled: false },
+                                            fontSize: 13,
+                                            wordWrap: 'on',
+                                            scrollBeyondLastLine: false,
+                                            automaticLayout: true,
+                                            tabSize: 2,
+                                        }}
+                                    />
+                                </div>
+                            </div>
+                        )}
+
                         {/* Settings Tab */}
-                        {activeTab === 'settings' && selectedSection && (
+                        {activeTab === 'settings' && selectedSection && !isHtmlPage && selectedSection.type !== 'html_block' && (
                             <ScrollArea className="h-full relative z-10 bg-background">
                                 <div className="p-6 max-w-2xl">
                                     {/* Section Header with Enabled Toggle */}
@@ -1388,9 +1971,39 @@ export default function Index({
                             </ScrollArea>
                         )}
 
-                        {activeTab === 'settings' && !selectedSection && (
-                            <div className="h-full flex items-center justify-center text-muted-foreground relative z-10 bg-background">
-                                {t('Select a section to edit')}
+                        {activeTab === 'settings' && isHtmlPage && (
+                            <div className="h-full flex flex-col relative z-10 bg-background">
+                                <MonacoEditor
+                                    height="100%"
+                                    language="html"
+                                    value={htmlCodeValue}
+                                    onChange={(value) => setHtmlCodeValue(value ?? '')}
+                                    theme={resolvedTheme === 'dark' ? 'vs-dark' : 'light'}
+                                    options={{
+                                        minimap: { enabled: false },
+                                        fontSize: 13,
+                                        wordWrap: 'on',
+                                        scrollBeyondLastLine: false,
+                                        automaticLayout: true,
+                                        tabSize: 2,
+                                    }}
+                                />
+                            </div>
+                        )}
+
+                        {activeTab === 'settings' && !selectedSection && !isHtmlPage && (
+                            <div className="h-full flex flex-col items-center justify-center text-muted-foreground relative z-10 bg-background gap-3">
+                                <p>{t('Select a section to edit')}</p>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="border-dashed"
+                                    onClick={handleAddHtmlBlock}
+                                    disabled={isAddingBlock}
+                                >
+                                    {isAddingBlock ? <Loader2 className="h-4 w-4 me-1.5 animate-spin" /> : <Plus className="h-4 w-4 me-1.5" />}
+                                    {t('Add HTML Block')}
+                                </Button>
                             </div>
                         )}
 
@@ -1407,7 +2020,7 @@ export default function Index({
                                 )}
                                 <iframe
                                     key={previewKey}
-                                    src={`/admin/landing-builder/preview?locale=${selectedLocale}`}
+                                    src={`/admin/landing-builder/preview?locale=${selectedLocale}${currentPage ? `&page=${currentPage.id}` : ''}`}
                                     className="w-full h-full border-0 relative z-10"
                                     title={t('Landing Page Preview')}
                                     onLoad={() => setPreviewLoading(false)}

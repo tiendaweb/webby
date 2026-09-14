@@ -26,6 +26,7 @@ class DatabaseSeeder extends Seeder
             PaymentGatewayPluginsSeeder::class,
             LanguageSeeder::class,
             LandingPageSeeder::class,
+            AiConnectorModuleSeeder::class,
         ]);
 
         // Get the Pro plan for admin subscription

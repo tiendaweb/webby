@@ -51,12 +51,10 @@ export default function Index({
                     </div>
                 </div>
 
-                {/* Current Subscription or No Subscription Alert */}
-                {subscription ? (
-                    <CurrentSubscriptionCard subscription={subscription} />
-                ) : pendingSubscription ? (
-                    <BankTransferPending subscription={pendingSubscription} />
-                ) : (
+                {/* Keep a pending plan change visible even while the current plan remains active. */}
+                {subscription && <CurrentSubscriptionCard subscription={subscription} />}
+                {pendingSubscription && <BankTransferPending subscription={pendingSubscription} />}
+                {!subscription && !pendingSubscription && (
                     <NoSubscriptionAlert />
                 )}
 

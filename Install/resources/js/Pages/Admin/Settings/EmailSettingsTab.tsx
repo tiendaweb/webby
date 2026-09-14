@@ -1,5 +1,6 @@
 import { useForm, router } from '@inertiajs/react';
 import { FormEventHandler, useState } from 'react';
+import axios from 'axios';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -50,11 +51,21 @@ export default function EmailSettingsTab({ settings, notificationEvents }: Props
 
     const submit: FormEventHandler = (e) => {
         e.preventDefault();
-        put(route('admin.settings.email'), {
-            preserveScroll: true,
-            onSuccess: () => toast.success(t('Email settings updated')),
-            onError: () => toast.error(t('Failed to update settings')),
-        });
+
+        // Filter out empty password
+        const submitData = { ...data };
+        const { smtp_password, ...finalData } = submitData;
+        const dataToSubmit = smtp_password ? submitData : finalData;
+
+        axios.put(route('admin.settings.email'), dataToSubmit)
+            .then(() => {
+                toast.success(t('Email settings updated'));
+                window.location.reload();
+            })
+            .catch((error) => {
+                toast.error(t('Failed to update settings'));
+                console.error(error);
+            });
     };
 
     const sendTestEmail = () => {

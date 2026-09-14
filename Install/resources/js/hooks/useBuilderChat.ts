@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useBuilderPusher, CompleteEvent, ActionEvent, StatusEvent, ErrorEvent, MessageEvent as PusherMessageEvent, ThinkingEvent, BroadcastConfig, SummarizationCompleteEvent } from './useBuilderPusher';
 import { useBuilderReverb, ReverbConfig } from './useBuilderReverb';
-import { useChatHistory, ChatMessage } from './useChatHistory';
+import { useChatHistory, ChatMessage, ServerNote } from './useChatHistory';
 import { useSessionReconnection, SessionStatus } from './useSessionReconnection';
 import type { AttachedFile } from '@/types/chat';
 import axios from 'axios';
@@ -40,6 +40,9 @@ export interface UseBuilderChatOptions {
 
 export interface UseBuilderChatReturn {
     messages: ChatMessage[];
+    /** Fold polled connector notes/replies into the thread. */
+    applyNotes: (notes: ServerNote[]) => void;
+    addMessage: (message: ChatMessage) => void;
     progress: BuildProgress;
     isLoading: boolean;
     isStarting: boolean;
@@ -559,6 +562,10 @@ export function useBuilderChat(projectId: string, options: UseBuilderChatOptions
 
     return {
         messages: history.messages,
+        // Connector notes live in the same thread but are filled in by
+        // polling rather than by builder events.
+        applyNotes: history.applyNotes,
+        addMessage: history.addMessage,
         progress,
         isLoading,
         isStarting,
