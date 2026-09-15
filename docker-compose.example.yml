@@ -1,0 +1,109 @@
+# Plantilla del compose de producción (aapp.pro).
+# El archivo real, docker-compose.yml, está en .gitignore porque lleva las
+# credenciales de MySQL en texto plano y este repo es público.
+# Para levantarlo: copiar a docker-compose.yml y reemplazar los __PLACEHOLDER__.
+
+version: '3.8'
+
+services:
+  webby:
+    build: .
+    container_name: webby-app
+    environment:
+      - APP_NAME=Webby
+      - APP_ENV=production
+      - APP_DEBUG=false
+      - APP_URL=https://aapp.pro
+      - APP_BASE_DOMAIN=aapp.pro
+      # Extra base domains that serve the same published projects (comma separated).
+      # Keeps every site published under *.aapp.host reachable after the move to aapp.pro.
+      - APP_ALIAS_DOMAINS=aapp.host
+      - APP_TIMEZONE=UTC
+      - DB_CONNECTION=mysql
+      - DB_HOST=webby-mysql
+      - DB_PORT=3306
+      - DB_DATABASE=webby
+      - DB_USERNAME=webby
+      - DB_PASSWORD=__DB_PASSWORD__
+      - LOG_CHANNEL=stack
+      - LOG_LEVEL=error
+    depends_on:
+      - webby-mysql
+    ports:
+      - "127.0.0.1:3100:80"
+    volumes:
+      - webby_storage:/var/www/html/storage
+      - webby_bootstrap:/var/www/html/bootstrap/cache
+      # Runtime .env kept on the host so APP_KEY (and any manual edit)
+      # survives container recreation.
+      - ./.env.runtime:/var/www/html/.env
+      # Multi base domain support (aapp.pro primary + aapp.host alias).
+      # Mounted from the source tree so the patch survives container recreation;
+      # the same files are already in Install/ for the next full image rebuild.
+      - ./Install/app/Support/BaseDomainHelper.php:/var/www/html/app/Support/BaseDomainHelper.php:ro
+      - ./Install/app/Http/Middleware/IdentifyProjectBySubdomain.php:/var/www/html/app/Http/Middleware/IdentifyProjectBySubdomain.php:ro
+      - ./Install/app/Http/Middleware/IdentifyProjectByCustomDomain.php:/var/www/html/app/Http/Middleware/IdentifyProjectByCustomDomain.php:ro
+      - ./Install/app/Http/Middleware/VerifyCsrfToken.php:/var/www/html/app/Http/Middleware/VerifyCsrfToken.php:ro
+      - ./Install/app/Providers/AppServiceProvider.php:/var/www/html/app/Providers/AppServiceProvider.php:ro
+      - ./Install/config/app.php:/var/www/html/config/app.php:ro
+    networks:
+      - traefik
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.webby.rule=Host(`aapp.pro`) || HostRegexp(`[a-z0-9-]+\\.aapp\\.pro`) || Host(`aapp.host`) || HostRegexp(`[a-z0-9-]+\\.aapp\\.host`)"
+      - "traefik.http.routers.webby.entrypoints=web,websecure"
+      - "traefik.http.routers.webby.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.webby.tls.domains[0].main=aapp.pro"
+      - "traefik.http.routers.webby.tls.domains[0].sans=*.aapp.pro"
+      - "traefik.http.routers.webby.tls.domains[1].main=aapp.host"
+      - "traefik.http.routers.webby.tls.domains[1].sans=*.aapp.host"
+      - "traefik.http.routers.webby.priority=200"
+      - "traefik.http.routers.webby.middlewares=webby-headers"
+      - "traefik.http.services.webby.loadbalancer.server.port=80"
+      - "traefik.http.middlewares.webby-headers.headers.customrequestheaders.X-Forwarded-Proto=https"
+      # Custom domain aapp.business -> project "AAPP Business" (admin@aapp.business).
+      # Separate router so the cert for this zone is requested independently of aapp.pro/aapp.host.
+      - "traefik.http.routers.webby-aappbusiness.rule=Host(`aapp.business`) || Host(`www.aapp.business`)"
+      - "traefik.http.routers.webby-aappbusiness.entrypoints=web,websecure"
+      # HTTP-01 resolver: DNS-01 fails for this zone because Let's Encrypt's secondary
+      # validation perspectives cannot reach byte/pixel.dns-parking.com for it.
+      - "traefik.http.routers.webby-aappbusiness.tls.certresolver=lehttp"
+      # Apex + www only. A wildcard SAN would put two ACME challenges on the same
+      # _acme-challenge.aapp.business TXT name for no gain — this client has no subdomains.
+      - "traefik.http.routers.webby-aappbusiness.tls.domains[0].main=aapp.business"
+      - "traefik.http.routers.webby-aappbusiness.tls.domains[0].sans=www.aapp.business"
+      - "traefik.http.routers.webby-aappbusiness.priority=200"
+      - "traefik.http.routers.webby-aappbusiness.service=webby"
+      # The app matches custom domains by exact host, so www is redirected to the apex.
+      - "traefik.http.routers.webby-aappbusiness.middlewares=webby-headers,webby-www-to-apex"
+      - "traefik.http.middlewares.webby-www-to-apex.redirectregex.regex=^https?://www\\.aapp\\.business/(.*)"
+      - "traefik.http.middlewares.webby-www-to-apex.redirectregex.replacement=https://aapp.business/$${1}"
+      - "traefik.http.middlewares.webby-www-to-apex.redirectregex.permanent=true"
+
+  webby-mysql:
+    image: mysql:8.0
+    container_name: webby-mysql
+    environment:
+      - MYSQL_DATABASE=webby
+      - MYSQL_USER=webby
+      - MYSQL_PASSWORD=__DB_PASSWORD__
+      - MYSQL_ROOT_PASSWORD=__DB_ROOT_PASSWORD__
+      - MYSQL_INITDB_SKIP_TZINFO=yes
+    ports:
+      - "127.0.0.1:3301:3306"
+    volumes:
+      - webby_mysql_data:/var/lib/mysql
+    networks:
+      - traefik
+    restart: unless-stopped
+    command: --default-authentication-plugin=mysql_native_password --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+
+volumes:
+  webby_storage:
+  webby_bootstrap:
+  webby_mysql_data:
+
+networks:
+  traefik:
+    external: true

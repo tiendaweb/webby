@@ -33,3 +33,4 @@ return new class extends Migration
         // No-op intentionally: language activation policy is app-specific.
     }
 };
+

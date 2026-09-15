@@ -31,3 +31,14 @@ Thumbs.db
 *.tmp
 *.log
 .env.runtime
+
+# Dumps de la base de producción (datos de clientes) — nunca al repo público
+backups/
+
+# Compose real: contiene credenciales de MySQL y labels de dominios.
+# La plantilla versionada es docker-compose.example.yml
+docker-compose.yml
+docker-compose.yml.bak-*
+
+# Contiene la key del builder prebuilt
+Builder/prebuilt/config.json

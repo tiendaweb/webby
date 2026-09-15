@@ -37,6 +37,7 @@ Route::middleware('verify.server.key')->group(function () {
     // Firestore collections for builder AI agent
     Route::get('/builder/projects/{project}/firestore/collections', [BuilderFirestoreController::class, 'collections']);
 });
+
 // Public file serving - no auth required
 // Filenames are UUIDs so they are unguessable, safe to serve publicly.
 // Used by AI-generated code to embed project files (images, etc.) in <img> tags.
@@ -128,3 +129,4 @@ Route::middleware('mcp.cors')->group(function () {
         ->name('api.oauth.revoke');
     Route::options('/oauth/revoke', fn () => response('', 204));
 });
+

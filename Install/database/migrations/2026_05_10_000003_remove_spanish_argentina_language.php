@@ -35,3 +35,4 @@ return new class extends Migration
         // Intentionally no-op: this migration removes deprecated locale data.
     }
 };
+
