@@ -35,10 +35,9 @@ Thumbs.db
 # Dumps de la base de producción (datos de clientes) — nunca al repo público
 backups/
 
-# Compose real: contiene credenciales de MySQL y labels de dominios.
-# La plantilla versionada es docker-compose.example.yml
-docker-compose.yml
+# El compose real SÍ se versiona: las credenciales salen de .env (ver .env.example).
 docker-compose.yml.bak-*
 
-# Contiene la key del builder prebuilt
+# Lleva la server_key del builder, que debe coincidir con la fila de la tabla
+# `builders` en la DB. Es distinta por instalación; la plantilla es config.example.json
 Builder/prebuilt/config.json
